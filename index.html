@@ -11,7 +11,17 @@
 <title>NSE Inventúra</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+// Načítaj jsQR asynchrónne - ak nie je dostupné, použijeme BarcodeDetector
+window._jsQRReady = false;
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+  s.onload = function(){ window._jsQRReady = true; };
+  s.onerror = function(){ window._jsQRReady = false; };
+  document.head.appendChild(s);
+})();
+</script>
 <style>
 :root{
   --bg:#0f1117;--bg2:#171a23;--bg3:#1e2130;--bg4:#252840;
@@ -546,10 +556,23 @@ function importJSON(data){
   let items=[], skladId='', skladName='', invName='';
 
   if(Array.isArray(data)){ items=data; }
-  else if(data.items){ items=data.items; skladId=data.sklad||''; skladName=data.skladName||data.name||skladId; invName=data.name||'Inventúra – '+skladName; }
+  else if(data.items){ items=data.items; }
+  else { toast('Neplatná štruktúra JSON súboru','err'); return; }
+
+  // Podpora pre NSE_INVENTURA_IMPORT v2.0 (nový formát z Evidencie)
+  if(data.type === 'NSE_INVENTURA_IMPORT'){
+    skladId   = data.sklad    || '';
+    skladName = data.skladName || data.name || skladId;
+    invName   = 'Inventúra – ' + skladName;
+  } else {
+    // Starší formát alebo manuálny JSON
+    skladId   = data.sklad || data.skladId || '';
+    skladName = data.skladName || data.name || skladId;
+    invName   = data.name || 'Inventúra – ' + skladName;
+  }
 
   if(!items.length){ toast('Súbor neobsahuje žiadne položky','err'); return; }
-  if(!skladId){ toast('Chýba ID skladu v súbore','warn'); }
+  if(!skladId){ toast('Chýba ID skladu v súbore — importujem bez väzby na QR','warn'); }
 
   const inv = {
     id:        skladId ? 'INV-'+skladId : 'INV-'+Date.now(),
@@ -559,11 +582,20 @@ function importJSON(data){
     date:      new Date().toLocaleDateString('sk-SK'),
     finished:  false,
     items: items.map(it=>({
-      vcm:         (it.vcm||it.VCM||it.id||'').toString().toUpperCase(),
-      name:        it.name||it.nazov||it.vcm||'–',
-      typ:         it.typ||'Zásoby',
-      zmj:         it.zmj||'ks',
-      expectedQty: Number(it.qty||it.expectedQty||0),
+      // itemId = interné ID z Evidencie — QR kód položky ho obsahuje
+      itemId:      it.id   || '',
+      // VČM ako záloha (ak QR kód neobsahuje itemId)
+      vcm:         (it.vcm || it.VCM || '').toString().toUpperCase(),
+      // Názov — Evidencia používa "nazov" (bez diakritiky v kľúči)
+      name:        it.nazov || it.name || it.vcm || '–',
+      typ:         it.typ   || 'Zásoby',
+      zmj:         it.zmj   || 'ks',
+      zt:          it.zt    || '',
+      kat:         it.kat   || '',
+      rnu:         it.rnu   || '',
+      sarza:       it.sarza || '',
+      cisloMat:    it.cisloMat || '',
+      expectedQty: Number(it.qty || it.expectedQty || 0),
       actualQty:   null,
       scanned:     false,
       skipped:     false,
@@ -574,9 +606,10 @@ function importJSON(data){
   // Prepis ak existuje nedokončená pre rovnaký sklad — zachovaj postup
   const ex = DB.findIndex(i=>i.skladId===skladId&&!i.finished);
   if(ex>=0){
-    const old = DB[ex];
+    const oldInv = DB[ex];
     inv.items = inv.items.map(ni=>{
-      const oi = old.items.find(x=>x.vcm===ni.vcm);
+      // Hľadaj zhodu podľa itemId, potom VČM
+      const oi = oldInv.items.find(x=>(ni.itemId && x.itemId===ni.itemId)||(ni.vcm && x.vcm===ni.vcm));
       return oi ? {...ni, actualQty:oi.actualQty, scanned:oi.scanned, skipped:oi.skipped} : ni;
     });
     DB[ex] = inv;
@@ -668,7 +701,9 @@ async function startCam(){
     video.srcObject=s;
     await video.play();
     scanning=true;
-    st.textContent='🔍 Hľadám QR kód...'; st.className='cam-status pulsing';
+    const bdAvail = 'BarcodeDetector' in window;
+    st.textContent = bdAvail ? '🔍 Hľadám QR kód...' : '🔍 Hľadám QR kód... (načítavam dekodér)';
+    st.className='cam-status pulsing';
     runScan();
   };
 
@@ -703,23 +738,61 @@ function stopCam(){
 
 function retryCamera(){ startCam(); }
 
-function runScan(){
-  const video  = document.getElementById('qr-video');
+async function runScan(){
+  const video = document.getElementById('qr-video');
   const canvas = document.getElementById('qr-canvas');
-  const ctx    = canvas.getContext('2d');
-  scanTmr = setInterval(()=>{
-    if(!scanning || video.readyState!==video.HAVE_ENOUGH_DATA) return;
-    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-    ctx.drawImage(video,0,0);
-    const id = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const ctx = canvas.getContext('2d');
+
+  // BarcodeDetector — natívne API v Chrome Android (bez knižníc, offline)
+  const hasBD = ('BarcodeDetector' in window);
+  let detector = null;
+  if(hasBD){
     try{
-      const code = jsQR(id.data,id.width,id.height,{inversionAttempts:'dontInvert'});
-      if(code&&code.data){
-        const raw=code.data, now=Date.now();
-        if(raw!==(lastRaw) || now-lastTime>3000){ lastRaw=raw; lastTime=now; onQR(raw); }
-      }
-    }catch(e){}
-  },150);
+      detector = new BarcodeDetector({formats:['qr_code']});
+      document.getElementById('cam-status').textContent = '🔍 Hľadám QR kód...';
+    }catch(e){ detector = null; }
+  }
+
+  const tryDecode = async () => {
+    if(!scanning || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+    // Metóda 1: BarcodeDetector (Chrome Android, offline, rýchly)
+    if(detector){
+      try{
+        const codes = await detector.detect(video);
+        if(codes && codes.length > 0){
+          const raw = codes[0].rawValue;
+          const now = Date.now();
+          if(raw && (raw !== lastRaw || now - lastTime > 3000)){
+            lastRaw = raw; lastTime = now; onQR(raw);
+          }
+        }
+        return;
+      }catch(e){ detector = null; } // BarcodeDetector zlyhal, prejdi na jsQR
+    }
+
+    // Metóda 2: jsQR (ak je načítaný z CDN)
+    if(window._jsQRReady && typeof jsQR === 'function'){
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      try{
+        const code = jsQR(id.data, id.width, id.height, {inversionAttempts:'dontInvert'});
+        if(code && code.data){
+          const raw = code.data, now = Date.now();
+          if(raw !== lastRaw || now - lastTime > 3000){ lastRaw = raw; lastTime = now; onQR(raw); }
+        }
+      }catch(e){}
+      return;
+    }
+
+    // Žiadna metóda nie je dostupná
+    if(!hasBD && !window._jsQRReady){
+      document.getElementById('cam-status').textContent = '⚠️ QR dekodér sa načítava... (potrebný internet)';
+    }
+  };
+
+  scanTmr = setInterval(tryDecode, 200);
 }
 
 // Photo fallback
@@ -728,15 +801,37 @@ document.getElementById('qr-photo').addEventListener('change',function(e){
   const r=new FileReader();
   r.onload=function(ev){
     const img=new Image();
-    img.onload=function(){
+    img.onload=async function(){
       const canvas=document.getElementById('qr-canvas');
       canvas.width=img.width; canvas.height=img.height;
       const ctx=canvas.getContext('2d');
       ctx.drawImage(img,0,0);
-      const id=ctx.getImageData(0,0,canvas.width,canvas.height);
-      const code=jsQR(id.data,id.width,id.height,{inversionAttempts:'attemptBoth'});
-      if(code&&code.data){ document.getElementById('cam-status').className='cam-status active'; onQR(code.data); }
-      else{ document.getElementById('cam-status').textContent='❌ QR sa nenašiel – skús znova'; document.getElementById('cam-status').className='cam-status error'; }
+      let found = false;
+
+      // Skús BarcodeDetector
+      if('BarcodeDetector' in window){
+        try{
+          const bd = new BarcodeDetector({formats:['qr_code']});
+          const codes = await bd.detect(img);
+          if(codes && codes.length > 0){
+            found = true;
+            document.getElementById('cam-status').className='cam-status active';
+            onQR(codes[0].rawValue);
+          }
+        }catch(e){}
+      }
+
+      // Fallback na jsQR
+      if(!found && window._jsQRReady && typeof jsQR==='function'){
+        const id=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code=jsQR(id.data,id.width,id.height,{inversionAttempts:'attemptBoth'});
+        if(code&&code.data){ found=true; document.getElementById('cam-status').className='cam-status active'; onQR(code.data); }
+      }
+
+      if(!found){
+        document.getElementById('cam-status').textContent='❌ QR sa nenašiel – skús znova';
+        document.getElementById('cam-status').className='cam-status error';
+      }
     };
     img.src=ev.target.result;
   };
@@ -789,11 +884,17 @@ function startEmptyInv(){
   INV=inv; goScan();
 }
 
-function lookupVcm(vcm){
+function lookupVcm(raw){
   if(!INV){ toast('Najprv naskenuj QR kód skladu','warn'); return; }
-  const item=INV.items.find(x=>x.vcm===vcm);
+  const q = raw.trim().toUpperCase();
+  // QR kód položky z Evidencie obsahuje interné ID (napr. "ZAS-1234567890")
+  // Hľadáme najprv podľa itemId, potom podľa VČM
+  const item = INV.items.find(x=>
+    (x.itemId && x.itemId.toUpperCase()===q) ||
+    (x.vcm    && x.vcm.toUpperCase()===q)
+  );
   if(!item){
-    document.getElementById('mo-unknown-vcm').textContent=vcm;
+    document.getElementById('mo-unknown-vcm').textContent=raw;
     openMo('mo-unknown'); stopCam(); return;
   }
   goItem(item);
@@ -822,9 +923,10 @@ document.getElementById('manual-vcm').addEventListener('keydown',e=>{ if(e.key==
 // ═══════════════════════════════════════════════════════
 function renderItem(){
   const it=ITEM;
-  document.getElementById('item-vcm').textContent     = it.vcm;
+  // Zobraz VČM ak existuje, inak itemId
+  document.getElementById('item-vcm').textContent     = it.vcm ? it.vcm : (it.itemId||'–');
   document.getElementById('item-name').textContent    = it.name;
-  document.getElementById('item-typ').textContent     = it.typ;
+  document.getElementById('item-typ').textContent     = it.typ + (it.zt?' · ZT '+it.zt:'') + (it.kat?' · Kat.'+it.kat:'');
   document.getElementById('item-zmj').textContent     = it.zmj;
   document.getElementById('item-sklad-tag').textContent = INV.skladId;
   document.getElementById('exp-qty').textContent      = it.expectedQty;
