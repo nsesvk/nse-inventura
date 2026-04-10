@@ -376,9 +376,9 @@ canvas#qr-canvas{display:none}
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
         <button class="btn full" onclick="exportReport('json')">💾 Export JSON</button>
-        <button class="btn pr full" onclick="exportReport('html')">📄 Export Report</button>
+        <button class="btn pr full" onclick="exportPDF(INV)">📄 Export PDF (tento sklad)</button>
       </div>
-      <button class="btn dr full" style="margin-top:8px" onclick="askFinish()">🏁 Ukončiť inventúru</button>
+      <button class="btn ok full" style="margin-top:8px" onclick="askFinish()">🏁 Ďalší sklad / Ukončiť</button>
     </div>
 
   </div>
@@ -424,16 +424,25 @@ canvas#qr-canvas{display:none}
   </div>
 </div>
 
-<!-- MODAL: Ukončiť inventúru -->
+<!-- MODAL: Ďalší sklad / Ukončiť inventúru -->
 <div class="mo" id="mo-finish">
   <div class="mo-box">
-    <h2>Ukončiť inventúru?</h2>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Inventúra bude označená ako dokončená. Odporúčame pred ukončením stiahnuť report.</p>
-    <div id="mo-finish-stats" style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:13px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button class="btn full" onclick="closeMo('mo-finish')">Zrušiť</button>
-      <button class="btn ok full" onclick="finishInv()">✓ Ukončiť a exportovať</button>
+    <h2 style="margin-bottom:6px">Sklad dokončený ✓</h2>
+    <div id="mo-finish-stats" style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:13px;line-height:1.8"></div>
+
+    <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px">📦 POKRAČOVAŤ — ďalší sklad</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Naskenuj QR kód ďalšieho skladu a pokračuj v inventúre.</div>
+      <button class="btn pr full" onclick="continueNextSklad()">📷 Načítať ďalší sklad</button>
     </div>
+
+    <div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">🏁 UKONČIŤ — vygenerovať PDF</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Spojí výsledky <strong id="mo-finish-inv-count">všetkých</strong> skladov do jedného PDF reportu.</div>
+      <button class="btn ok full" onclick="finishAllAndPDF()">📄 Ukončiť a vygenerovať PDF</button>
+    </div>
+
+    <button class="btn full" onclick="closeMo('mo-finish')" style="font-size:12px;color:var(--text3)">Späť — pokračovať v tomto sklade</button>
   </div>
 </div>
 
@@ -1115,95 +1124,197 @@ function renderResults(){
 function exportReport(type){
   if(!INV) return;
   if(type==='json') exportJSON();
-  else exportHTML();
+  else exportPDF(INV);
 }
 
 function exportJSON(){
+  if(!INV) return;
   const data={
-    exportType:'NSE_INVENTURA_REPORT', version:'1.0',
+    exportType:'NSE_INVENTURA_REPORT', version:'2.0',
     exported:new Date().toISOString(),
-    sklad:INV.skladId, skladName:INV.skladName,
-    datum:INV.date,
-    summary:{
-      celkom:INV.items.length,
-      skontrolovaných:INV.items.filter(x=>x.scanned).length,
-      sedí:INV.items.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length,
-      chýba:INV.items.filter(x=>x.scanned&&x.actualQty<x.expectedQty).length,
-      prebytok:INV.items.filter(x=>x.scanned&&x.actualQty>x.expectedQty).length,
-      preskočené:INV.items.filter(x=>x.skipped).length,
-      navyše:INV.items.filter(x=>x.isExtra).length
-    },
-    položky:INV.items.map(it=>({
-      vcm:it.vcm, name:it.name, typ:it.typ, zmj:it.zmj,
-      evidencia:it.expectedQty, skutočnosť:it.actualQty,
+    sklad:INV.skladId, skladName:INV.skladName, datum:INV.date,
+    items:INV.items.map(it=>({
+      vcm:it.vcm, nazov:it.name, typ:it.typ, zmj:it.zmj,
+      rnu:it.rnu||'', sarza:it.sarza||'', evCislo:it.evCislo||'', cisloMat:it.cisloMat||'',
+      evidencia:it.expectedQty, skutocnost:it.actualQty,
       rozdiel:it.scanned?it.actualQty-it.expectedQty:null,
-      stav:it.skipped?'Preskočené':it.scanned?(it.actualQty===it.expectedQty?'Sedí':it.actualQty>it.expectedQty?'Prebytok':'Chýba'):it.isExtra?'Navyše':'Neskontrolované'
+      stav:getStav(it)
     }))
   };
   dlFile('inventura_'+INV.skladId+'_'+isoDate()+'.json', JSON.stringify(data,null,2), 'application/json');
   toast('JSON exportovaný','ok');
 }
 
-function exportHTML(){
-  const rows = INV.items.map(it=>{
-    const diff=it.scanned?it.actualQty-it.expectedQty:null;
-    const stav=it.skipped?'Preskočené':it.scanned?(diff===0?'✓ Sedí':diff>0?'▲ Prebytok '+diff:'▼ Chýba '+diff):it.isExtra?'+ Navyše':'—';
-    const color=it.skipped||!it.scanned?'#555b78':diff===0?'#2ecc71':diff>0?'#f0a500':'#e74c3c';
-    return `<tr>
-      <td style="font-family:monospace;font-size:12px;color:#4a9eff">${it.vcm}</td>
-      <td>${it.name}</td>
-      <td style="text-align:center">${it.typ}</td>
-      <td style="text-align:center">${it.expectedQty} ${it.zmj}</td>
-      <td style="text-align:center">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
-      <td style="text-align:center;font-weight:700;color:${color}">${stav}</td>
-    </tr>`;
-  }).join('');
-
-  const sc=INV.items.filter(x=>x.scanned);
-  const ok=sc.filter(x=>x.actualQty===x.expectedQty).length;
-  const err=sc.filter(x=>x.actualQty<x.expectedQty).length;
-  const over=sc.filter(x=>x.actualQty>x.expectedQty).length;
-
-  const html=`<!DOCTYPE html><html lang="sk"><head><meta charset="UTF-8">
-<title>Inventúra – ${INV.skladName} – ${INV.date}</title>
-<style>
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf0;padding:24px;margin:0}
-  h1{font-size:22px;font-weight:700;color:#4a9eff;letter-spacing:1px;margin-bottom:4px}
-  .sub{font-size:13px;color:#8b90a8;margin-bottom:24px}
-  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
-  .s-box{background:#171a23;border-radius:10px;padding:14px;text-align:center}
-  .s-box .n{font-size:28px;font-weight:700;font-family:monospace}
-  .s-box .l{font-size:11px;color:#555b78;text-transform:uppercase;letter-spacing:0.5px}
-  .ok .n{color:#2ecc71}.warn .n{color:#f0a500}.err .n{color:#e74c3c}.total .n{color:#4a9eff}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th{background:#1e2130;padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#555b78;letter-spacing:0.8px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.08)}
-  td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.05)}
-  tr:last-child td{border-bottom:none}
-  tr:hover td{background:rgba(255,255,255,0.02)}
-  @media print{body{background:#fff;color:#000}th{background:#f0f0f0;color:#333}.s-box{background:#f8f8f8}h1{color:#1a56db}.s-box .l{color:#666}}
-</style></head><body>
-<h1>📦 INVENTÚRNY REPORT</h1>
-<div class="sub">${INV.skladName} &nbsp;·&nbsp; <span style="font-family:monospace;color:#4a9eff">${INV.skladId}</span> &nbsp;·&nbsp; ${INV.date}</div>
-<div class="summary">
-  <div class="s-box total"><div class="n">${INV.items.length}</div><div class="l">Celkom</div></div>
-  <div class="s-box ok"><div class="n">${ok}</div><div class="l">Sedí</div></div>
-  <div class="s-box warn"><div class="n">${over}</div><div class="l">Prebytok</div></div>
-  <div class="s-box err"><div class="n">${err}</div><div class="l">Chýba</div></div>
-</div>
-<table>
-  <thead><tr><th>VČM</th><th>Názov</th><th>Typ</th><th>Evidencia</th><th>Skutočnosť</th><th>Výsledok</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div style="margin-top:20px;font-size:11px;color:#555b78">Vygenerované: ${new Date().toLocaleString('sk-SK')} &nbsp;·&nbsp; NSE Inventúra</div>
-</body></html>`;
-
-  dlFile('report_'+INV.skladId+'_'+isoDate()+'.html', html, 'text/html');
-  toast('Report exportovaný','ok');
+function getStav(it){
+  if(it.skipped) return 'Preskočené';
+  if(it.isExtra) return 'Navyše';
+  if(!it.scanned) return 'Neskontrolované';
+  const d = it.actualQty - it.expectedQty;
+  return d===0 ? 'Sedí' : d>0 ? 'Prebytok' : 'Chýba';
 }
 
-function dlFile(name, content, mime){
+// Vygeneruje riadky tabuľky pre dané položky
+function buildTableRows(items){
+  return items.map(it=>{
+    const diff = it.scanned ? it.actualQty - it.expectedQty : null;
+    const stav = getStav(it);
+    const stavColor = it.skipped||!it.scanned ? '#6b7280'
+      : diff===0 ? '#16a34a' : diff>0 ? '#d97706' : '#dc2626';
+    const stavBg = it.skipped||!it.scanned ? '#f3f4f6'
+      : diff===0 ? '#dcfce7' : diff>0 ? '#fef3c7' : '#fee2e2';
+    const stavText = it.skipped ? '⏭ Preskočené'
+      : !it.scanned ? '○ Neskontrolované'
+      : it.isExtra ? '+ Navyše'
+      : diff===0 ? '✓ Sedí'
+      : diff>0 ? '▲ +'+diff : '▼ '+diff;
+
+    return `<tr>
+      <td style="font-family:monospace;font-size:11px;color:#1d4ed8;white-space:nowrap">${it.vcm||'–'}</td>
+      <td style="font-size:12px">${it.name||'–'}</td>
+      <td style="font-size:11px;text-align:center;white-space:nowrap">${it.rnu||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap">${it.sarza||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap">${it.evCislo||it.cisloMat||'–'}</td>
+      <td style="font-size:11px;text-align:center">${it.typ||'–'}</td>
+      <td style="font-size:11px;text-align:center;white-space:nowrap">${it.expectedQty} ${it.zmj}</td>
+      <td style="font-size:11px;text-align:center;white-space:nowrap">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${stavColor};background:${stavBg}">${stavText}</span>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Vygeneruje súhrnný blok pre jeden sklad
+function buildSkladSection(inv){
+  const sc = inv.items.filter(x=>x.scanned);
+  const total = inv.items.length;
+  const ok    = sc.filter(x=>x.actualQty===x.expectedQty).length;
+  const over  = sc.filter(x=>x.actualQty>x.expectedQty).length;
+  const under = sc.filter(x=>x.actualQty<x.expectedQty).length;
+  const skip  = inv.items.filter(x=>x.skipped).length;
+  const extra = inv.items.filter(x=>x.isExtra).length;
+  const rows  = buildTableRows(inv.items);
+
+  return `
+  <div style="margin-bottom:32px;page-break-inside:avoid">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
+      <h2 style="font-size:16px;font-weight:700;color:#1e3a5f;margin:0">${inv.skladName||inv.skladId}</h2>
+      <span style="font-family:monospace;font-size:12px;color:#6b7280">${inv.skladId}</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#dbeafe;color:#1d4ed8">Celkom: ${total}</span>
+      <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#dcfce7;color:#16a34a">✓ Sedí: ${ok}</span>
+      ${over>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fef3c7;color:#d97706">▲ Prebytok: ${over}</span>`:''}
+      ${under>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fee2e2;color:#dc2626">▼ Chýba: ${under}</span>`:''}
+      ${skip>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#f3f4f6;color:#6b7280">⏭ Preskočené: ${skip}</span>`:''}
+      ${extra>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fef3c7;color:#d97706">+ Navyše: ${extra}</span>`:''}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+      <thead>
+        <tr style="background:#1e3a5f;color:#fff">
+          <th style="padding:7px 8px;text-align:left;font-size:10px;letter-spacing:0.5px">VČM</th>
+          <th style="padding:7px 8px;text-align:left;font-size:10px;letter-spacing:0.5px">NÁZOV</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">RNU</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">ŠARŽA</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">EV.Č./DM</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">TYP</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">EVIDENCIA</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">SKUTOČNOSŤ</th>
+          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">VÝSLEDOK</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// Exportuje PDF pre jeden sklad
+function exportPDF(inv){
+  if(!inv) return;
+  const html = buildPDFDocument([inv], 'Inventúrny report – '+inv.skladName, inv.date);
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>{ w.print(); }, 600);
+}
+
+// Exportuje PDF pre všetky sklady naraz
+function exportAllPDF(inventories){
+  const title = 'Inventúrny report – Všetky sklady';
+  const date  = new Date().toLocaleDateString('sk-SK');
+  const html  = buildPDFDocument(inventories, title, date);
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>{ w.print(); }, 600);
+}
+
+function buildPDFDocument(invList, title, date){
+  // Celkový súhrn naprieč všetkými skladmi
+  const allItems  = invList.flatMap(i=>i.items);
+  const totalAll  = allItems.length;
+  const okAll     = allItems.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
+  const overAll   = allItems.filter(x=>x.scanned&&x.actualQty>x.expectedQty).length;
+  const underAll  = allItems.filter(x=>x.scanned&&x.actualQty<x.expectedQty).length;
+  const skipAll   = allItems.filter(x=>x.skipped).length;
+
+  const sections = invList.map(buildSkladSection).join('<hr style="border:none;border-top:2px solid #e5e7eb;margin:24px 0">');
+
+  return `<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px 28px;color:#111;background:#fff;font-size:13px}
+  h1{font-size:20px;font-weight:700;color:#1e3a5f;margin:0 0 4px}
+  .meta{font-size:12px;color:#6b7280;margin-bottom:20px}
+  .total-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;padding:14px;background:#f0f7ff;border-radius:8px;border-left:4px solid #1d4ed8}
+  .ts-item{text-align:center;min-width:80px}
+  .ts-n{font-size:22px;font-weight:700;font-family:monospace}
+  .ts-l{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px}
+  .ts-ok .ts-n{color:#16a34a}.ts-over .ts-n{color:#d97706}.ts-under .ts-n{color:#dc2626}.ts-tot .ts-n{color:#1d4ed8}
+  tr:nth-child(even) td{background:#f9fafb}
+  td{padding:6px 8px;border-bottom:1px solid #e5e7eb;vertical-align:middle}
+  @media print{
+    body{padding:12px 16px;font-size:11px}
+    h1{font-size:16px}
+    .no-print{display:none}
+    tr{page-break-inside:avoid}
+    h2{page-break-before:auto}
+  }
+</style>
+</head>
+<body>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
+    <div>
+      <h1>📦 ${title}</h1>
+      <div class="meta">
+        Dátum: <strong>${date}</strong> &nbsp;·&nbsp;
+        Počet skladov: <strong>${invList.length}</strong> &nbsp;·&nbsp;
+        Vygenerované: ${new Date().toLocaleString('sk-SK')}
+      </div>
+    </div>
+    <button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Tlačiť / Uložiť PDF</button>
+  </div>
+
+  <div class="total-summary">
+    <div class="ts-item ts-tot"><div class="ts-n">${totalAll}</div><div class="ts-l">Celkom</div></div>
+    <div class="ts-item ts-ok"><div class="ts-n">${okAll}</div><div class="ts-l">Sedí</div></div>
+    <div class="ts-item ts-over"><div class="ts-n">${overAll}</div><div class="ts-l">Prebytok</div></div>
+    <div class="ts-item ts-under"><div class="ts-n">${underAll}</div><div class="ts-l">Chýba</div></div>
+    <div class="ts-item"><div class="ts-n" style="color:#6b7280">${skipAll}</div><div class="ts-l">Preskočené</div></div>
+  </div>
+
+  ${sections}
+</body>
+</html>`;
+}
+
+function dlFile(name, cnt, mime){
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.href=URL.createObjectURL(new Blob([cnt],{type:mime}));
   a.download=name; a.click(); URL.revokeObjectURL(a.href);
 }
 function isoDate(){ return new Date().toISOString().slice(0,10); }
@@ -1213,25 +1324,67 @@ function isoDate(){ return new Date().toISOString().slice(0,10); }
 // ═══════════════════════════════════════════════════════
 function askFinish(){
   if(!INV) return;
-  const sc=INV.items.filter(x=>x.scanned);
-  const ok=sc.filter(x=>x.actualQty===x.expectedQty).length;
-  const err=sc.filter(x=>x.actualQty!==x.expectedQty).length;
-  const skip=INV.items.filter(x=>x.skipped).length;
-  const notDone=INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-  document.getElementById('mo-finish-stats').innerHTML=
-    `<span style="color:var(--green)">✓ Sedí: ${ok}</span> &nbsp;
-     <span style="color:var(--red)">✗ Nesedí: ${err}</span> &nbsp;
+  // Označ aktuálny sklad ako dokončený
+  INV.finished = true;
+  INV.finishedDate = new Date().toLocaleDateString('sk-SK');
+  saveDB();
+
+  const sc    = INV.items.filter(x=>x.scanned);
+  const ok    = sc.filter(x=>x.actualQty===x.expectedQty).length;
+  const err   = sc.filter(x=>x.actualQty!==x.expectedQty).length;
+  const skip  = INV.items.filter(x=>x.skipped).length;
+  const notDone = INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+
+  // Koľko skladov je dokončených
+  const doneCount = DB.filter(i=>i.finished).length;
+  const allCount  = DB.length;
+
+  document.getElementById('mo-finish-stats').innerHTML =
+    `<div style="font-size:13px;color:var(--text2);margin-bottom:8px">
+       <strong style="color:var(--text)">${INV.skladName}</strong> — ${INV.skladId}
+     </div>
+     <span style="color:var(--green)">✓ Sedí: ${ok}</span> &nbsp;
+     <span style="color:var(--red)">✗ Rozdiel: ${err}</span> &nbsp;
      <span style="color:var(--amber)">⏭ Preskočené: ${skip}</span> &nbsp;
-     <span style="color:var(--text3)">○ Neskontrolované: ${notDone}</span>`;
+     <span style="color:var(--text3)">○ Neskont.: ${notDone}</span>
+     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">
+       Dokončených skladov: <strong style="color:var(--text)">${doneCount} / ${allCount}</strong>
+     </div>`;
+
+  document.getElementById('mo-finish-inv-count').textContent =
+    doneCount > 1 ? doneCount+' skladov' : 'tohto skladu';
+
   openMo('mo-finish');
 }
 
-function finishInv(){
-  INV.finished=true; INV.finishedDate=new Date().toLocaleDateString('sk-SK');
-  saveDB(); closeMo('mo-finish');
-  exportHTML(); // automaticky stiahni report
-  toast('✓ Inventúra dokončená','ok');
-  setTimeout(goWelcome, 800);
+// Pokračuj so skenovaním ďalšieho skladu
+function continueNextSklad(){
+  closeMo('mo-finish');
+  INV = null;
+  show('s-scan');
+  document.getElementById('scan-title').textContent = 'Naskenuj QR kód ďalšieho skladu';
+  document.getElementById('scan-sub').textContent   = 'Priblíž tablet ku QR kódu na dverách';
+  document.getElementById('topbar-badge').style.display = 'none';
+  document.getElementById('prog-bar').style.width = '0%';
+  document.getElementById('prog-label').textContent = 'Čakám na QR kód skladu...';
+  ['cnt-ok','cnt-over','cnt-under'].forEach(id=>document.getElementById(id).textContent='–');
+  startCam();
+}
+
+// Ukončí inventúru a vygeneruje jeden PDF pre všetky sklady
+function finishAllAndPDF(){
+  closeMo('mo-finish');
+  // Označ všetky nedokončené ako dokončené
+  DB.forEach(inv=>{ if(!inv.finished){ inv.finished=true; inv.finishedDate=new Date().toLocaleDateString('sk-SK'); } });
+  saveDB();
+
+  const doneInvs = DB.filter(i=>i.items && i.items.length > 0);
+  if(!doneInvs.length){ toast('Žiadne dáta na export','err'); return; }
+
+  toast('Generujem PDF...','info');
+  setTimeout(()=>{
+    exportAllPDF(doneInvs);
+  }, 300);
 }
 
 // ═══════════════════════════════════════════════════════
