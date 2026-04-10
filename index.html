@@ -415,7 +415,8 @@ canvas#qr-canvas{display:none}
   <div class="mo-box">
     <h2>Neznámy VČM</h2>
     <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Tento kód nie je v zozname inventúry:</p>
-    <div style="font-family:var(--mono);padding:10px 12px;background:var(--bg3);border-radius:var(--r);margin-bottom:16px;color:var(--amber);font-size:13px;word-break:break-all" id="mo-unknown-vcm"></div>
+    <div style="font-family:var(--mono);padding:10px 12px;background:var(--bg3);border-radius:var(--r);margin-bottom:8px;color:var(--amber);font-size:13px;word-break:break-all" id="mo-unknown-vcm"></div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:12px;word-break:break-all;line-height:1.6" id="mo-unknown-diag"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button class="btn full" onclick="closeMo('mo-unknown');resumeScan()">Ignorovať</button>
       <button class="btn am full" onclick="addExtra()">+ Zaznamenať navyše</button>
@@ -857,7 +858,7 @@ function onQR(raw){
     st.textContent='✓ Sklad: '+p.name; st.className='cam-status active';
     onSkladQR(p.id, p.name);
   } else {
-    st.textContent='✓ VČM: '+p.value; st.className='cam-status active';
+    st.textContent='✓ '+p.value; st.className='cam-status active';
     lookupVcm(p.value);
   }
 }
@@ -886,15 +887,21 @@ function startEmptyInv(){
 
 function lookupVcm(raw){
   if(!INV){ toast('Najprv naskenuj QR kód skladu','warn'); return; }
-  const q = raw.trim().toUpperCase();
-  // QR kód položky z Evidencie obsahuje interné ID (napr. "ZAS-1234567890")
-  // Hľadáme najprv podľa itemId, potom podľa VČM
+  const q = raw.trim();
+
+  // Skús presná zhoda (case-insensitive) podľa itemId aj VČM
   const item = INV.items.find(x=>
-    (x.itemId && x.itemId.toUpperCase()===q) ||
-    (x.vcm    && x.vcm.toUpperCase()===q)
+    (x.itemId && x.itemId.trim().toLowerCase()===q.toLowerCase()) ||
+    (x.vcm    && x.vcm.trim().toLowerCase()===q.toLowerCase())
   );
+
   if(!item){
-    document.getElementById('mo-unknown-vcm').textContent=raw;
+    // Ukáž čo sme dostali vs čo máme — pomôže pri diagnostike
+    const sample = INV.items.slice(0,3).map(x=>'['+x.itemId+'|'+x.vcm+']').join(' ');
+    document.getElementById('mo-unknown-vcm').textContent = raw;
+    // Pridaj diagnostický text pod VČM
+    const diagEl = document.getElementById('mo-unknown-diag');
+    if(diagEl) diagEl.textContent = 'Načítané: "'+q+'" | Príklady v zozname: '+sample;
     openMo('mo-unknown'); stopCam(); return;
   }
   goItem(item);
