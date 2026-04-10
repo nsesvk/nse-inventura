@@ -846,9 +846,24 @@ function parseQR(raw){
   raw=raw.trim();
   try{
     const o=JSON.parse(raw);
-    if(o.type==='NSE_SKLAD') return {type:'sklad',id:o.id,name:o.name};
-    return {type:'vcm', value:(o.vcm||o.VCM||o.id||'').toUpperCase()};
-  }catch{ return {type:'vcm',value:raw.toUpperCase()}; }
+    // QR kód skladu
+    if(o.type==='NSE_SKLAD') return {type:'sklad', id:o.id, name:o.name};
+    // QR kód položky — nový formát s viacerými atribútmi
+    if(o.t==='NSE_ITEM') return {
+      type: 'item',
+      id:   o.id  || '',
+      vcm:  o.vcm || '',
+      rnu:  o.rnu || '',
+      sar:  o.sar || '',
+      evc:  o.evc || '',
+      dmc:  o.dmc || ''
+    };
+    // Starý formát — len VČM alebo ID
+    return {type:'item', id:o.id||'', vcm:(o.vcm||o.VCM||''), rnu:'', sar:'', evc:'', dmc:''};
+  }catch{
+    // Plain string — VČM alebo ID
+    return {type:'item', id:'', vcm:raw, rnu:'', sar:'', evc:'', dmc:''};
+  }
 }
 
 function onQR(raw){
@@ -858,8 +873,9 @@ function onQR(raw){
     st.textContent='✓ Sklad: '+p.name; st.className='cam-status active';
     onSkladQR(p.id, p.name);
   } else {
-    st.textContent='✓ '+p.value; st.className='cam-status active';
-    lookupVcm(p.value);
+    const label = p.vcm || p.id || raw;
+    st.textContent='✓ '+label; st.className='cam-status active';
+    lookupItem(p);
   }
 }
 
@@ -885,26 +901,67 @@ function startEmptyInv(){
   INV=inv; goScan();
 }
 
-function lookupVcm(raw){
+// Hľadá položku podľa kombinácie identifikačných atribútov z QR kódu
+// VČM môže byť rovnaké pre viac položiek — preto kombinujeme RNU, šaržu, ev.číslo
+function lookupItem(p){
   if(!INV){ toast('Najprv naskenuj QR kód skladu','warn'); return; }
-  const q = raw.trim();
 
-  // Skús presná zhoda (case-insensitive) podľa itemId aj VČM
-  const item = INV.items.find(x=>
-    (x.itemId && x.itemId.trim().toLowerCase()===q.toLowerCase()) ||
-    (x.vcm    && x.vcm.trim().toLowerCase()===q.toLowerCase())
-  );
+  const norm = s => (s||'').trim().toLowerCase();
+  const vcm  = norm(p.vcm);
+  const rnu  = norm(p.rnu);
+  const sar  = norm(p.sar);
+  const evc  = norm(p.evc);
+  const dmc  = norm(p.dmc);
+  const id   = norm(p.id);
 
-  if(!item){
-    // Ukáž čo sme dostali vs čo máme — pomôže pri diagnostike
-    const sample = INV.items.slice(0,3).map(x=>'['+x.itemId+'|'+x.vcm+']').join(' ');
-    document.getElementById('mo-unknown-vcm').textContent = raw;
-    // Pridaj diagnostický text pod VČM
-    const diagEl = document.getElementById('mo-unknown-diag');
-    if(diagEl) diagEl.textContent = 'Načítané: "'+q+'" | Príklady v zozname: '+sample;
-    openMo('mo-unknown'); stopCam(); return;
+  // Skórovacie hľadanie — čím viac atribútov sedí, tým lepšia zhoda
+  let best = null, bestScore = 0;
+
+  for(const x of INV.items){
+    if(x.scanned && x.actualQty !== null) continue; // už skontrolované, preskoč
+
+    let score = 0;
+
+    // Zhoda podľa interného ID (presná, najspoľahlivejšia)
+    if(id && norm(x.itemId) === id){ score += 100; }
+
+    // Zhoda podľa VČM
+    if(vcm && norm(x.vcm) === vcm) score += 10;
+
+    // Zhoda podľa RNU (ak je zadané v QR aj v zozname)
+    if(rnu && norm(x.rnu) === rnu) score += 20;
+
+    // Zhoda podľa šarže
+    if(sar && norm(x.sarza) === sar) score += 20;
+
+    // Zhoda podľa evidenčného čísla
+    if(evc && norm(x.evCislo) === evc) score += 30;
+
+    // Zhoda podľa DM čísla
+    if(dmc && norm(x.cisloMat) === dmc) score += 30;
+
+    if(score > bestScore){ bestScore = score; best = x; }
   }
-  goItem(item);
+
+  // Minimálne skóre 10 (aspoň VČM musí sedieť)
+  if(best && bestScore >= 10){
+    goItem(best);
+    return;
+  }
+
+  // Nenašlo sa — ukáž čo sme dostali
+  const rawLabel = p.vcm || p.id || '?';
+  const sample = INV.items.slice(0,3)
+    .map(x=>'VČM:'+x.vcm+(x.rnu?' RNU:'+x.rnu:'')+(x.sarza?' Šarža:'+x.sarza:'')).join(' | ');
+  document.getElementById('mo-unknown-vcm').textContent = rawLabel;
+  const diagEl = document.getElementById('mo-unknown-diag');
+  if(diagEl) diagEl.textContent = 'Hľadané: VČM='+p.vcm+' RNU='+p.rnu+' Šarža='+p.sar+' | Príklady: '+sample;
+  openMo('mo-unknown'); stopCam();
+}
+
+// Zachovaj starú funkciu ako alias pre manuálny vstup
+function lookupVcm(raw){
+  lookupItem({vcm: raw, id:'', rnu:'', sar:'', evc:'', dmc:''});
 }
 
 function addExtra(){
