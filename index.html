@@ -189,7 +189,10 @@ canvas#qr-canvas{display:none}
 .ri-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ri-diff{font-family:var(--mono);font-size:13px;font-weight:700;text-align:right;flex-shrink:0}
 .ri-diff.ok{color:var(--green)}.ri-diff.warn{color:var(--amber)}.ri-diff.err{color:var(--red)}.ri-diff.skip{color:var(--text3)}
-
+@keyframes scanFlash{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
+.scan-flash{position:fixed;inset:0;pointer-events:none;z-index:500;animation:scanFlash 0.4s ease forwards}
+.scan-flash.ok{background:rgba(46,204,113,0.25)}
+.scan-flash.err{background:rgba(231,76,60,0.2)}
 </style>
 </head>
 <body>
@@ -237,9 +240,18 @@ canvas#qr-canvas{display:none}
         <input type="file" id="file-inp" accept=".json,.JSON" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
       </div>
 
-      <div style="text-align:center">
-        <button class="btn" onclick="loadDemo()" style="font-size:12px;color:var(--text3)">🧪 Demo dáta</button>
+      <!-- Záloha / Obnova -->
+      <div class="card">
+        <div class="card-title">Záloha a obnova</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Pravidelne si zálohuj priebeh inventúry — ak by sa vymazala cache prehliadača, obnovíš zo zálohy.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="btn full ok" onclick="zalohaExport()" style="font-size:13px">💾 Zálohovať priebeh</button>
+          <label for="file-zaloha" class="btn full" style="cursor:pointer;justify-content:center;font-size:13px">↩ Obnoviť zálohu</label>
+        </div>
+        <input type="file" id="file-zaloha" accept=".json" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
       </div>
+
+
     </div>
 
     <!-- ═══════════ SCREEN: SCAN ═══════════ -->
@@ -283,17 +295,16 @@ canvas#qr-canvas{display:none}
       <!-- Manuálny vstup VČM + spresnenie -->
       <div class="card" style="margin-top:12px">
         <div class="card-title">Zadaj manuálne</div>
-        <div class="manual-row" style="margin-bottom:8px">
-          <input type="text" id="manual-vcm" placeholder="VČM (napr. VCM-001)" autocomplete="off">
-          <button class="btn pr" onclick="onManualVcm()">Hľadať</button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input type="text" id="manual-vcm" placeholder="VČM (napr. VCM-001)" autocomplete="off"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:11px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none;text-transform:uppercase">
           <input type="text" id="manual-rnu" placeholder="RNU (voliteľné)" autocomplete="off"
-            style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 10px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:11px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
           <input type="text" id="manual-sar" placeholder="Šarža (voliteľné)" autocomplete="off"
-            style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 10px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:11px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
+          <button class="btn pr full" onclick="onManualVcm()" style="padding:12px">Hľadať</button>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:6px">Vyplň RNU alebo šaržu ak má viacero položiek rovnaké VČM</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:8px">VČM je povinné · RNU a šarža pomôžu ak má viac položiek rovnaké VČM</div>
       </div>
 
       <!-- Stav inventúry -->
@@ -310,10 +321,11 @@ canvas#qr-canvas{display:none}
           <div id="pending-list" style="max-height:160px;overflow-y:auto;border-radius:var(--r);background:var(--bg3);border:1px solid var(--border)"></div>
           <button class="btn full" style="margin-top:6px;font-size:11px;color:var(--text3)" onclick="togglePendingList()">Skryť zoznam</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <button class="btn full" onclick="togglePendingList()" style="font-size:12px">📋 Čo zostáva</button>
           <button class="btn pr full" onclick="goResults()">Výsledky</button>
         </div>
+        <button class="btn full" onclick="zalohaExport()" style="font-size:11px;color:var(--text3)">💾 Zálohovať priebeh</button>
       </div>
     </div>
 
@@ -416,6 +428,25 @@ canvas#qr-canvas{display:none}
       <button class="btn ok full" style="margin-top:8px" onclick="askFinish()">🏁 Ďalší sklad / Ukončiť</button>
     </div>
 
+  </div>
+</div>
+
+<!-- MODAL: Uvítanie skladu -->
+<div class="mo" id="mo-sklad-uvit">
+  <div class="mo-box">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="font-size:36px">📦</div>
+      <div>
+        <h2 style="margin:0 0 3px;font-size:16px" id="mo-uvit-name"></h2>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--text3)" id="mo-uvit-id"></div>
+      </div>
+    </div>
+    <div id="mo-uvit-stats" style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:16px;font-size:13px;line-height:2"></div>
+    <div id="mo-uvit-last" style="font-size:11px;color:var(--text3);margin-bottom:16px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn full" onclick="closeMo('mo-sklad-uvit');goWelcome()">← Späť</button>
+      <button class="btn pr full" id="mo-uvit-btn" onclick="closeMo('mo-sklad-uvit');doGoScan()">▶ Spustiť</button>
+    </div>
   </div>
 </div>
 
@@ -550,9 +581,17 @@ function beep(freq, dur, type='sine', vol=0.3){
 }
 
 function soundOK(){
-  // Dvojité pípnutie nahor — ✓ Sedí
   beep(880, 0.08, 'sine', 0.25);
   setTimeout(()=>beep(1100, 0.12, 'sine', 0.2), 90);
+}
+
+function flashScreen(type){
+  const old = document.querySelector('.scan-flash');
+  if(old) old.remove();
+  const el = document.createElement('div');
+  el.className = 'scan-flash ' + type;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 450);
 }
 
 function soundError(){
@@ -604,14 +643,7 @@ function goWelcome(){
 
 function goScan(){
   if(!INV) return;
-  show('s-scan');
-  document.getElementById('scan-title').textContent = INV.skladName || INV.name;
-  document.getElementById('scan-sub').textContent   = INV.skladId + ' · ' + INV.items.length + ' položiek';
-  document.getElementById('topbar-badge').textContent = INV.skladId;
-  document.getElementById('topbar-badge').style.display = 'block';
-  updateProg();
-  updateCounts();
-  startCam();
+  doGoScan();
 }
 
 function goItem(item){
@@ -633,6 +665,47 @@ function goResults(){
 // WELCOME / IMPORT
 // ═══════════════════════════════════════════════════════
 function saveDB(){ localStorage.setItem('nse_inv_db', JSON.stringify(DB)); }
+
+// ── ZÁLOHA PRIEBEHU ──────────────────────────────────
+function zalohaExport(){
+  if(!DB.length){ toast('Žiadne dáta na zálohu','warn'); return; }
+  const zaloha = {
+    type:    'NSE_INVENTURA_ZALOHA',
+    version: '1.0',
+    saved:   new Date().toISOString(),
+    db:      DB
+  };
+  const name = 'inventura_zaloha_'+new Date().toISOString().slice(0,16).replace('T','_').replace(':','-')+'.json';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(zaloha,null,2)],{type:'application/json'}));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  toast('Záloha uložená: '+name,'ok');
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const fz = document.getElementById('file-zaloha');
+  if(fz) fz.addEventListener('change', function(e){
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try{
+        const data = JSON.parse(ev.target.result);
+        if(data.type === 'NSE_INVENTURA_ZALOHA' && data.db){
+          if(!confirm('Obnoviť zálohu z '+new Date(data.saved).toLocaleString('sk-SK')+'?\nAktuálne dáta budú nahradené.')) return;
+          DB = data.db;
+          saveDB();
+          renderList();
+          toast('Záloha obnovená — '+DB.length+' skladov','ok');
+        } else if(data.db){
+          DB = data.db; saveDB(); renderList(); toast('Záloha obnovená','ok');
+        } else {
+          toast('Neplatný súbor zálohy','err');
+        }
+      }catch{ toast('Neplatný súbor','err'); }
+    };
+    r.readAsText(f); this.value='';
+  });
+});
 
 function renderList(){
   const el = document.getElementById('inv-list');
@@ -675,7 +748,74 @@ function renderList(){
   }).join('');
 }
 
-function openInv(i){ INV = DB[i]; goScan(); }
+function openInv(i){ INV = DB[i]; showSkladUvit(); }
+
+function showSkladUvit(){
+  if(!INV) return;
+  const total   = INV.items.length;
+  const checked = INV.items.filter(x=>x.scanned||x.skipped).length;
+  const ok      = INV.items.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
+  const err     = INV.items.filter(x=>x.scanned&&x.actualQty!==x.expectedQty&&x.scanned).length;
+  const skip    = INV.items.filter(x=>x.skipped).length;
+  const notDone = INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+  const pct     = total ? Math.round(checked/total*100) : 0;
+
+  document.getElementById('mo-uvit-name').textContent = INV.skladName || INV.name;
+  document.getElementById('mo-uvit-id').textContent   = INV.skladId;
+
+  const statsHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent)">${total}</div>
+        <div style="font-size:10px;color:var(--text3)">Celkom</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--green)">${ok}</div>
+        <div style="font-size:10px;color:var(--text3)">Sedí</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:${err>0?'var(--red)':'var(--text3)'}">${err}</div>
+        <div style="font-size:10px;color:var(--text3)">Rozdiel</div>
+      </div>
+    </div>
+    <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:8px">
+      <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':'var(--accent)'};border-radius:2px"></div>
+    </div>
+    <div style="font-size:12px;color:var(--text2);text-align:center">${checked}/${total} skontrolovaných (${pct}%)</div>
+    ${notDone>0?`<div style="font-size:12px;color:var(--amber);text-align:center;margin-top:4px">Zostáva: ${notDone} položiek</div>`:''}
+    ${skip>0?`<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:2px">Preskočené: ${skip}</div>`:''}
+  `;
+  document.getElementById('mo-uvit-stats').innerHTML = statsHTML;
+
+  const lastEl = document.getElementById('mo-uvit-last');
+  lastEl.textContent = INV.finishedDate
+    ? 'Dokončená: ' + INV.finishedDate
+    : INV.date ? 'Importovaná: ' + INV.date : '';
+
+  const btn = document.getElementById('mo-uvit-btn');
+  if(INV.finished){
+    btn.textContent = '📋 Zobraziť výsledky';
+    btn.onclick = ()=>{ closeMo('mo-sklad-uvit'); doGoScan(); setTimeout(goResults,100); };
+  } else if(checked===0){
+    btn.textContent = '▶ Začať inventúru';
+    btn.onclick = ()=>{ closeMo('mo-sklad-uvit'); doGoScan(); };
+  } else {
+    btn.textContent = '▶ Pokračovať ('+notDone+' zostáva)';
+    btn.onclick = ()=>{ closeMo('mo-sklad-uvit'); doGoScan(); };
+  }
+
+  openMo('mo-sklad-uvit');
+}
+
+function doGoScan(){
+  if(!INV) return;
+  show('s-scan');
+  document.getElementById('scan-title').textContent = INV.skladName || INV.name;
+  document.getElementById('scan-sub').textContent   = INV.skladId + ' · ' + INV.items.length + ' položiek';
+  document.getElementById('topbar-badge').textContent = INV.skladId;
+  document.getElementById('topbar-badge').style.display = 'block';
+  updateProg(); updateCounts(); startCam();
+}
 
 function delInv(i){
   if(!confirm('Odstrániť inventúru pre ' + (DB[i].skladName||DB[i].skladId) + '?')) return;
@@ -1021,7 +1161,9 @@ function onQR(raw){
 function onSkladQR(id, name){
   stopCam();
   const found = DB.find(i=>i.skladId===id&&!i.finished);
-  if(found){ INV=found; toast('📦 '+name+' – '+found.items.length+' položiek','ok'); goScan(); return; }
+  if(found){ INV=found; showSkladUvit(); return; }
+  const foundFinished = DB.find(i=>i.skladId===id&&i.finished);
+  if(foundFinished){ INV=foundFinished; showSkladUvit(); return; }
   document.getElementById('mo-sklad-name').textContent=name;
   document.getElementById('mo-sklad-id').textContent=id;
   // Ulož ID pre prípad "Skenovať bez zoznamu"
@@ -1250,9 +1392,9 @@ function doConfirmItem(){
   if(!npVal) return;
   ITEM.actualQty=parseInt(npVal); ITEM.scanned=true; ITEM.skipped=false;
   const diff=ITEM.actualQty-ITEM.expectedQty;
-  if(diff===0){ toast('✓ Sedí!','ok'); soundOK(); }
-  else if(diff>0){ toast('⚠ Prebytok: +'+diff,'warn'); soundWarning(); }
-  else{ toast('✗ Chýba: '+diff,'err'); soundError(); }
+  if(diff===0){ toast('✓ Sedí!','ok'); soundOK(); flashScreen('ok'); }
+  else if(diff>0){ toast('⚠ Prebytok: +'+diff,'warn'); soundWarning(); flashScreen('err'); }
+  else{ toast('✗ Chýba: '+diff,'err'); soundError(); flashScreen('err'); }
   saveDB(); updateProg(); updateCounts();
   document.getElementById('btn-reopen-wrap').style.display='block';
   document.getElementById('btn-confirm').disabled=true;
@@ -1522,6 +1664,19 @@ function buildPDFDocument(invList, title, date){
   const notDone  = allItems.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
 
   const sections = invList.map(inv => {
+    // Zoraď: rozdiely a chýbajúce najprv, potom sedí, potom neskontrolované
+    inv = {...inv, items: [...inv.items].sort((a,b)=>{
+      const rank = x => {
+        if(x.isExtra) return 1;
+        if(!x.scanned && !x.skipped) return 5;
+        if(x.skipped) return 4;
+        if(x.scanned && x.actualQty < x.expectedQty) return 0;
+        if(x.scanned && x.actualQty > x.expectedQty) return 1;
+        if(x.scanned && x.actualQty === x.expectedQty) return 3;
+        return 5;
+      };
+      return rank(a) - rank(b);
+    })};
     const sc    = inv.items.filter(x=>x.scanned);
     const iOk   = sc.filter(x=>x.actualQty===x.expectedQty).length;
     const iOver = sc.filter(x=>x.actualQty>x.expectedQty).length;
@@ -1768,6 +1923,42 @@ function toast(msg, type){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
+
+// ═══════════════════════════════════════════════════════
+// PAGE VISIBILITY — upozornenie pri návrate do app
+// ═══════════════════════════════════════════════════════
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && INV && !INV.finished){
+    // Používateľ sa vrátil do app počas inventúry
+    const notDone = INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+    if(notDone > 0){
+      toast('Pokračuješ v inventúre: '+notDone+' položiek zostáva','info');
+    }
+    // Automaticky zálohovať pri každom návrate (ticho)
+    try{
+      const zaloha = { type:'NSE_INVENTURA_ZALOHA', version:'1.0', saved:new Date().toISOString(), db:DB };
+      localStorage.setItem('nse_inv_autosave', JSON.stringify(zaloha));
+    }catch(e){}
+  }
+});
+
+// Obnov z autosave ak chýba hlavná DB
+(function(){
+  const main = localStorage.getItem('nse_inv_db');
+  if((!main || main === '[]') ){
+    const auto = localStorage.getItem('nse_inv_autosave');
+    if(auto){
+      try{
+        const data = JSON.parse(auto);
+        if(data.db && data.db.length > 0){
+          DB = data.db;
+          saveDB();
+          toast('Obnovené z automatickej zálohy','info');
+        }
+      }catch(e){}
+    }
+  }
+})();
 
 // ═══════════════════════════════════════════════════════
 // INIT
