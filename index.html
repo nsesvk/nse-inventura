@@ -11,56 +11,32 @@
 <title>NSE Inventúra</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script>
-// jsQR — skenovanie QR kódov kamerou
-window._jsQRReady = false;
-(function(){
-  var s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
-  s.onload = function(){ window._jsQRReady = true; };
-  s.onerror = function(){ window._jsQRReady = false; };
-  document.head.appendChild(s);
-})();
-// qrcodejs — generovanie QR kódov (sync, export)
-window._qrCodeReady = false;
-(function(){
-  var s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-  s.onload = function(){ window._qrCodeReady = true; };
-  s.onerror = function(){ window._qrCodeReady = false; };
-  document.head.appendChild(s);
-})();
-</script>
+</head>
+<body>
+<div id="app"></div>
+<input type="file" id="file-inp" accept=".json,.JSON">
+<input type="file" id="file-zaloha" accept=".json">
+<input type="file" id="qr-photo" accept="image/*" capture="environment">
 <style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0f1117;color:#e8eaf0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.5;overflow:hidden}
+#file-inp,#file-zaloha,#qr-photo{position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0}
 :root{
   --bg:#0f1117;--bg2:#171a23;--bg3:#1e2130;--bg4:#252840;
   --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
   --text:#e8eaf0;--text2:#8b90a8;--text3:#555b78;
-  --accent:#4a9eff;--accent2:#2d6bbf;
-  --green:#2ecc71;--green-bg:rgba(46,204,113,0.12);
-  --red:#e74c3c;--red-bg:rgba(231,76,60,0.12);
-  --amber:#f0a500;--amber-bg:rgba(240,165,0,0.12);
-  --r:8px;--rl:14px;
-  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  --mono:'Courier New',monospace;
+  --accent:#4a9eff;--green:#2ecc71;--red:#e74c3c;--amber:#f0a500;
+  --green-bg:rgba(46,204,113,0.12);--red-bg:rgba(231,76,60,0.12);
+  --amber-bg:rgba(240,165,0,0.12);--blue-bg:rgba(74,158,255,0.12);
+  --r:8px;--rl:14px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;--mono:'Courier New',monospace;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden}
-body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;touch-action:manipulation}
-
-/* LAYOUT */
-.app{display:flex;flex-direction:column;height:100dvh}
+.app{display:flex;flex-direction:column;height:100dvh;position:relative}
 .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:54px;flex-shrink:0}
 .logo{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);letter-spacing:1px}
-.logo small{color:var(--text3);font-weight:400;font-size:11px}
 .main{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .screen{display:none}.screen.active{display:block}
-
-/* CARDS */
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:12px}
 .card-title{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
-
-/* BUTTONS */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;color:var(--text2);font-size:13px;font-family:var(--font);cursor:pointer;transition:all 0.12s;white-space:nowrap;-webkit-appearance:none}
 .btn:active{transform:scale(0.96)}
 .btn.pr{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
@@ -70,362 +46,251 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 .btn.full{width:100%;padding:13px}
 .btn.xl{padding:16px;font-size:15px;border-radius:var(--rl)}
 .btn:disabled{opacity:0.35;pointer-events:none}
-
-/* TAGS */
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px}
 .tag.ok{background:var(--green-bg);color:var(--green)}
 .tag.err{background:var(--red-bg);color:var(--red)}
 .tag.warn{background:var(--amber-bg);color:var(--amber)}
-.tag.info{background:rgba(74,158,255,0.12);color:var(--accent)}
-
-/* MODAL */
+.tag.info{background:var(--blue-bg);color:var(--accent)}
 .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;align-items:center;justify-content:center;padding:20px}
 .mo.open{display:flex}
 .mo-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:22px;width:min(440px,100%);max-height:90vh;overflow-y:auto}
 .mo-box h2{font-size:16px;font-weight:600;margin-bottom:14px}
-
-/* TOAST */
 .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:11px 22px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;pointer-events:none;white-space:nowrap;animation:toastIn 0.2s ease}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.toast.ok{background:var(--green);color:#000}
-.toast.err{background:var(--red);color:#fff}
-.toast.info{background:var(--accent);color:#fff}
-.toast.warn{background:var(--amber);color:#000}
-
+.toast.ok{background:var(--green);color:#000}.toast.err{background:var(--red);color:#fff}.toast.info{background:var(--accent);color:#fff}.toast.warn{background:var(--amber);color:#000}
 /* WELCOME */
-.hero{text-align:center;padding:28px 0 20px}
-.hero-icon{font-size:48px;margin-bottom:10px}
-.hero h1{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent);letter-spacing:2px}
+.hero{text-align:center;padding:24px 0 16px}
+.hero h1{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--accent);letter-spacing:2px;margin-top:8px}
 .hero p{font-size:12px;color:var(--text3);margin-top:4px}
-.import-label{display:block;border:1.5px dashed var(--border2);border-radius:var(--rl);padding:28px 20px;text-align:center;cursor:pointer;transition:all 0.15s;margin-bottom:12px}
-.import-label:active{border-color:var(--accent);background:rgba(74,158,255,0.06)}
-.import-label .il-icon{font-size:32px;margin-bottom:8px}
-.import-label p{color:var(--text3);font-size:13px}
-.inv-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;display:flex;align-items:center;gap:12px}
+.import-zone{display:block;border:1.5px dashed var(--border2);border-radius:var(--rl);padding:24px;text-align:center;cursor:pointer;margin-bottom:10px}
+.import-zone:active{border-color:var(--accent);background:var(--blue-bg)}
+.import-zone p{color:var(--text3);font-size:13px;margin-top:8px}
+.inv-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px}
 .inv-card:active{border-color:var(--accent)}
-.inv-card .ic-body{flex:1;min-width:0}
-.inv-card .ic-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px}
-.inv-card .ic-meta{font-size:11px;color:var(--text3)}
-.inv-card .ic-arrow{color:var(--text3);font-size:18px;flex-shrink:0}
 .pbar-wrap{height:3px;background:var(--bg4);border-radius:2px;margin-top:6px;overflow:hidden}
-.pbar{height:100%;border-radius:2px;transition:width 0.3s}
-
+.pbar{height:100%;border-radius:2px}
 /* SCAN */
-.scan-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.back-btn{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 12px;color:var(--text2);font-size:13px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:5px;-webkit-appearance:none}
-.scan-title{font-size:15px;font-weight:600;color:var(--text)}
-.scan-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.scan-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.back-btn{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 12px;color:var(--text2);font-size:13px;font-family:var(--font);cursor:pointer;-webkit-appearance:none}
 .prog-bar-wrap{background:var(--bg3);border-radius:4px;height:5px;overflow:hidden;margin-bottom:4px}
 .prog-bar{height:100%;background:var(--accent);border-radius:4px;transition:width 0.4s}
-.prog-label{font-size:11px;color:var(--text3);margin-bottom:14px}
-
+.prog-label{font-size:11px;color:var(--text3);margin-bottom:12px}
 /* CAMERA */
-.cam-wrap{position:relative;background:#000;border-radius:var(--rl);overflow:hidden;margin-bottom:10px;min-height:200px}
-.cam-wrap video{width:100%;display:block;max-height:260px;object-fit:cover}
-canvas#qr-canvas{display:none}
+.cam-box{background:#000;border-radius:var(--rl);overflow:hidden;margin-bottom:10px;position:relative;min-height:180px}
+.cam-box video{width:100%;display:block;max-height:240px;object-fit:cover}
+#qr-canvas{display:none}
 .cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.cam-frame{width:170px;height:170px;position:relative}
-.cf-tl,.cf-tr,.cf-bl,.cf-br{position:absolute;width:28px;height:28px;border-color:var(--accent);border-style:solid;opacity:0.9}
-.cf-tl{top:0;left:0;border-width:3px 0 0 3px;border-radius:3px 0 0 3px}
-.cf-tr{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 3px 0 0}
-.cf-bl{bottom:0;left:0;border-width:0 0 3px 3px;border-radius:0 0 0 3px}
-.cf-br{bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 3px 0}
-.scan-line{position:absolute;left:12%;right:12%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanAnim 2s ease-in-out infinite}
+.cam-frame{width:160px;height:160px;position:relative}
+.cf{position:absolute;width:26px;height:26px;border-color:var(--accent);border-style:solid;opacity:0.9}
+.cf.tl{top:0;left:0;border-width:3px 0 0 3px}.cf.tr{top:0;right:0;border-width:3px 3px 0 0}
+.cf.bl{bottom:0;left:0;border-width:0 0 3px 3px}.cf.br{bottom:0;right:0;border-width:0 3px 3px 0}
+.scan-line{position:absolute;left:10%;right:10%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanAnim 2s ease-in-out infinite}
 @keyframes scanAnim{0%,100%{top:15%}50%{top:85%}}
-.cam-status{text-align:center;font-size:12px;color:var(--text3);padding:6px;min-height:28px}
+.cam-status{text-align:center;font-size:12px;color:var(--text3);padding:6px;min-height:26px}
 .cam-status.active{color:var(--green);font-weight:600}
 .cam-status.error{color:var(--red)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .pulsing{animation:pulse 1.8s ease infinite}
-.photo-fb{display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:10px;min-height:160px}
-.photo-fb p{font-size:12px;color:var(--text2);text-align:center}
-
-/* MANUAL INPUT */
-.manual-row{display:flex;gap:8px}
-.manual-row input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none;text-transform:uppercase}
-.manual-row input:focus{border-color:var(--accent)}
-
 /* ITEM */
-.item-card{border-radius:var(--rl);border:2px solid var(--border2);background:var(--bg2);padding:18px;margin-bottom:12px;transition:border-color 0.2s}
-.item-card.match{border-color:var(--green)}
-.item-card.over{border-color:var(--amber)}
-.item-card.under{border-color:var(--red)}
+.item-card{border-radius:var(--rl);border:2px solid var(--border2);background:var(--bg2);padding:16px;margin-bottom:12px;transition:border-color 0.2s}
+.item-card.match{border-color:var(--green)}.item-card.over{border-color:var(--amber)}.item-card.under{border-color:var(--red)}
 .item-vcm{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:3px}
 .item-name{font-size:17px;font-weight:600;color:var(--text);margin-bottom:10px}
 .counts-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .count-box{background:var(--bg3);border-radius:var(--r);padding:12px;text-align:center}
-.count-box .cn{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1;margin-bottom:3px}
+.count-box .cn{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1;margin-bottom:3px;transition:color 0.15s}
 .count-box .cl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px}
-.count-box.exp .cn{color:var(--accent)}
-.count-box.act .cn{color:var(--text);transition:color 0.15s}
-.count-box.act.match .cn{color:var(--green)}
-.count-box.act.over .cn{color:var(--amber)}
-.count-box.act.under .cn{color:var(--red)}
+.count-box.exp .cn{color:var(--accent)}.count-box.act .cn{color:var(--text)}
+.count-box.act.match .cn{color:var(--green)}.count-box.act.over .cn{color:var(--amber)}.count-box.act.under .cn{color:var(--red)}
 .diff-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:var(--r);background:var(--bg3);margin-bottom:14px}
-.diff-row .dl{font-size:12px;color:var(--text3)}
-.diff-row .dv{font-family:var(--mono);font-size:15px;font-weight:700}
-.dv.ok{color:var(--green)}.dv.plus{color:var(--amber)}.dv.minus{color:var(--red)}
-
-/* NUMPAD */
+.dv{font-family:var(--mono);font-size:15px;font-weight:700}.dv.ok{color:var(--green)}.dv.plus{color:var(--amber)}.dv.minus{color:var(--red)}
+/* QUICK MODE */
+.quick-sedi{display:flex;align-items:center;justify-content:center;width:100%;padding:20px 16px;border-radius:var(--rl);background:var(--green-bg);border:2px solid var(--green);color:var(--green);font-size:22px;font-weight:700;cursor:pointer;gap:12px;font-family:var(--font);-webkit-appearance:none;margin-bottom:10px}
+.quick-sedi:active{transform:scale(0.97)}
+.quick-iny{width:100%;padding:12px;border-radius:var(--r);background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:14px;cursor:pointer;font-family:var(--font);-webkit-appearance:none}
+.quick-iny:active{background:var(--bg3)}
+.numpad-wrap{display:none}.numpad-wrap.open{display:block;animation:slideDown 0.18s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 .numpad-display{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:12px 16px;text-align:right;font-family:var(--mono);font-size:34px;font-weight:700;color:var(--text);margin-bottom:10px;min-height:58px}
 .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.np-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:15px 8px;font-size:22px;font-family:var(--mono);color:var(--text);cursor:pointer;font-weight:600;transition:all 0.1s;-webkit-appearance:none}
-.np-btn:active{background:var(--bg4);border-color:var(--border2);transform:scale(0.94)}
-.np-btn.zero{grid-column:span 2}
-.np-btn.del{color:var(--text3);font-size:16px}
+.np-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:15px 8px;font-size:22px;font-family:var(--mono);color:var(--text);cursor:pointer;font-weight:600;-webkit-appearance:none}
+.np-btn:active{background:var(--bg4);transform:scale(0.94)}.np-btn.zero{grid-column:span 2}.np-btn.del{color:var(--text3);font-size:16px}
 .action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-
 /* RESULTS */
-.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
 .sum-box{background:var(--bg3);border-radius:var(--r);padding:12px;text-align:center}
 .sum-box .sn{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1;margin-bottom:3px}
 .sum-box .sl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px}
 .sum-box.ok .sn{color:var(--green)}.sum-box.warn .sn{color:var(--amber)}.sum-box.err .sn{color:var(--red)}
 .filter-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px}
 .filter-row::-webkit-scrollbar{display:none}
-.fb{padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text3);font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.fb{padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text3);font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap;flex-shrink:0;-webkit-appearance:none}
 .fb.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 .ri{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer}
-.ri:last-child{border-bottom:none}
-.ri:active{background:rgba(255,255,255,0.03)}
+.ri:last-child{border-bottom:none}.ri:active{background:rgba(255,255,255,0.03)}
 .ri-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.ri-icon.ok{background:var(--green-bg);color:var(--green)}
-.ri-icon.warn{background:var(--amber-bg);color:var(--amber)}
-.ri-icon.err{background:var(--red-bg);color:var(--red)}
-.ri-icon.skip{background:rgba(255,255,255,0.06);color:var(--text3)}
+.ri-icon.ok{background:var(--green-bg);color:var(--green)}.ri-icon.warn{background:var(--amber-bg);color:var(--amber)}
+.ri-icon.err{background:var(--red-bg);color:var(--red)}.ri-icon.skip{background:rgba(255,255,255,0.06);color:var(--text3)}
 .ri-body{flex:1;min-width:0}
 .ri-vcm{font-family:var(--mono);font-size:10px;color:var(--text3)}
 .ri-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ri-diff{font-family:var(--mono);font-size:13px;font-weight:700;text-align:right;flex-shrink:0}
 .ri-diff.ok{color:var(--green)}.ri-diff.warn{color:var(--amber)}.ri-diff.err{color:var(--red)}.ri-diff.skip{color:var(--text3)}
-@keyframes scanFlash{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
-.scan-flash{position:fixed;inset:0;pointer-events:none;z-index:500;animation:scanFlash 0.4s ease forwards}
-.scan-flash.ok{background:rgba(46,204,113,0.25)}
-.scan-flash.err{background:rgba(231,76,60,0.2)}
-
-/* Rýchly mód */
-.quick-sedi{
-  display:flex;align-items:center;justify-content:center;
-  width:100%;padding:22px 16px;border-radius:var(--rl);
-  background:var(--green-bg);border:2px solid var(--green);
-  color:var(--green);font-size:22px;font-weight:700;
-  cursor:pointer;gap:12px;transition:all 0.12s;
-  font-family:var(--font);-webkit-appearance:none;
-  margin-bottom:10px;
-}
-.quick-sedi:active{transform:scale(0.97);background:var(--green);color:#000}
-.quick-sedi .qs-exp{font-size:14px;font-weight:400;opacity:0.8}
-.quick-iny{
-  width:100%;padding:13px;border-radius:var(--r);
-  background:transparent;border:1px solid var(--border2);
-  color:var(--text2);font-size:14px;cursor:pointer;
-  font-family:var(--font);-webkit-appearance:none;
-  transition:all 0.12s;
-}
-.quick-iny:active{background:var(--bg3)}
-.numpad-wrap{display:none}
-.numpad-wrap.open{display:block}
-@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-.numpad-wrap.open{animation:slideDown 0.18s ease}
+/* FLASH */
+@keyframes flashAnim{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
+.flash{position:fixed;inset:0;pointer-events:none;z-index:500;animation:flashAnim 0.4s ease forwards}
+.flash.ok{background:rgba(46,204,113,0.25)}.flash.err{background:rgba(231,76,60,0.2)}
+/* PENDING LIST */
+.pending-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px}
+.pending-item:active{background:var(--bg3)}
+/* INPUT */
+.inp{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:11px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none}
+.inp:focus{border-color:var(--accent)}
+.inp.upper{text-transform:uppercase}
 </style>
-</head>
-<body>
-<div class="app">
 
-  <!-- TOPBAR -->
+<!-- HTML -->
+<div class="app" id="the-app" style="display:none">
   <div class="topbar">
-    <div class="logo">NSE<small> · </small>INVENTÚRA</div>
-    <div id="topbar-badge" style="display:none;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;background:rgba(74,158,255,0.12);color:var(--accent);border:1px solid rgba(74,158,255,0.25)"></div>
+    <div class="logo">NSE · INVENTÚRA</div>
+    <div id="topbar-badge" style="display:none;font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;background:var(--blue-bg);color:var(--accent);border:1px solid rgba(74,158,255,0.25)"></div>
   </div>
-
   <div class="main">
 
-    <!-- ═══════════ SCREEN: WELCOME ═══════════ -->
+    <!-- WELCOME -->
     <div class="screen active" id="s-welcome">
       <div class="hero">
-        <div class="hero-icon">📦</div>
+        <div style="font-size:48px">📦</div>
         <h1>INVENTÚRA</h1>
-        <p>Skladový kontrolný systém</p>
+        <p>Skladový kontrolný systém · NSE</p>
       </div>
-
-      <!-- Rýchly štart: sken skladu -->
       <div class="card" style="border-color:rgba(74,158,255,0.25);background:rgba(74,158,255,0.04)">
         <div class="card-title">Rýchly štart</div>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Naskenuj QR kód na dverách skladu — app sa automaticky prepne na správny sklad.</p>
-        <button class="btn pr full xl" onclick="startSkladScan()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="19" y="17" width="2" height="2"/><rect x="17" y="19" width="2" height="2"/><rect x="19" y="21" width="2" height="2"/></svg>
-          Naskenovať QR kód skladu
-        </button>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Naskenuj QR kód na dverách skladu.</p>
+        <button class="btn pr full xl" onclick="startSkladScan()">📷 Naskenovať QR kód skladu</button>
       </div>
-
-      <!-- Importované sklady -->
       <div class="card">
         <div class="card-title">Importované sklady</div>
-        <div id="inv-list"><p style="color:var(--text3);font-size:13px;text-align:center;padding:14px 0">Zatiaľ žiadne dáta.<br>Importuj JSON zo skladu nižšie.</p></div>
+        <div id="inv-list"><p style="color:var(--text3);font-size:13px;text-align:center;padding:14px 0">Žiadne dáta. Importuj JSON zo skladu.</p></div>
       </div>
-
-      <!-- Import JSON -->
       <div class="card">
         <div class="card-title">Importovať dáta zo skladu</div>
-        <label for="file-inp" class="import-label">
-          <div class="il-icon">📂</div>
+        <label class="import-zone" onclick="document.getElementById('file-inp').click()">
+          <div style="font-size:32px">📂</div>
           <p>Klepni sem a vyber JSON súbor exportovaný z NSE Evidencie</p>
         </label>
-        <input type="file" id="file-inp" accept=".json,.JSON" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
-      </div>
-
-      <!-- Synchronizácia -->
-      <div class="card">
-        <div class="card-title">Synchronizácia medzi tabletmi</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Pracujete dvaja súčasne? Exportuj priebeh jedného skladu ako QR kód a druhý tablet ho naskenuje.</p>
-        <button class="btn full" style="color:var(--accent);border-color:var(--accent)" onclick="openSync()">🔄 Otvoriť synchronizáciu</button>
-      </div>
-
-      <!-- Záloha / Obnova -->
-      <div class="card">
-        <div class="card-title">Záloha a obnova</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Pravidelne si zálohuj priebeh inventúry — ak by sa vymazala cache prehliadača, obnovíš zo zálohy.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button class="btn full ok" onclick="zalohaExport()" style="font-size:13px">💾 Zálohovať priebeh</button>
-          <label for="file-zaloha" class="btn full" style="cursor:pointer;justify-content:center;font-size:13px">↩ Obnoviť zálohu</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+          <button class="btn ok full" onclick="zalohaExport()">💾 Zálohovať</button>
+          <button class="btn full" onclick="document.getElementById('file-zaloha').click()">↩ Obnoviť zálohu</button>
         </div>
-        <input type="file" id="file-zaloha" accept=".json" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
       </div>
-
-
+      <div class="card">
+        <div class="card-title">Synchronizácia</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Pracujete dvaja? Exportuj QR kód a druhý tablet ho naskenuje.</p>
+        <button class="btn full" style="color:var(--accent);border-color:var(--accent)" onclick="openSync()">🔄 Synchronizovať</button>
+      </div>
     </div>
 
-    <!-- ═══════════ SCREEN: SCAN ═══════════ -->
+    <!-- SCAN -->
     <div class="screen" id="s-scan">
       <div class="scan-header">
         <button class="back-btn" onclick="goWelcome()">← Späť</button>
         <div>
-          <div class="scan-title" id="scan-title">Inventúra</div>
-          <div class="scan-sub" id="scan-sub"></div>
+          <div style="font-size:15px;font-weight:600;color:var(--text)" id="scan-title">Inventúra</div>
+          <div style="font-size:11px;color:var(--text3)" id="scan-sub"></div>
         </div>
       </div>
-
       <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>
-      <div class="prog-label" id="prog-label">0 / 0 skontrolovaných</div>
-
-      <!-- Kamera -->
-      <div class="cam-wrap" id="cam-wrap">
+      <div class="prog-label" id="prog-label">0 / 0</div>
+      <div class="cam-box" id="cam-box">
         <video id="qr-video" autoplay playsinline muted></video>
         <canvas id="qr-canvas"></canvas>
         <div class="cam-overlay">
           <div class="cam-frame">
-            <div class="cf-tl"></div><div class="cf-tr"></div>
-            <div class="cf-bl"></div><div class="cf-br"></div>
+            <div class="cf tl"></div><div class="cf tr"></div>
+            <div class="cf bl"></div><div class="cf br"></div>
             <div class="scan-line"></div>
           </div>
         </div>
-        <!-- Foto fallback (keď live kamera nefunguje) -->
-        <div class="photo-fb" id="photo-fb">
+        <div id="photo-fb" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:10px;min-height:180px">
           <div style="font-size:32px">📷</div>
-          <p>Live kamera nie je dostupná.<br>Odfot QR kód tlačidlom nižšie.</p>
-          <label for="qr-photo" class="btn pr">📸 Odfotiť QR kód</label>
-          <input type="file" id="qr-photo" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+          <p style="font-size:12px;color:var(--text2);text-align:center">Live kamera nie je dostupná.</p>
+          <label class="btn pr" onclick="document.getElementById('qr-photo').click()">📸 Odfotiť QR kód</label>
         </div>
       </div>
       <div class="cam-status pulsing" id="cam-status">🔍 Hľadám QR kód...</div>
       <div id="cam-retry" style="display:none;text-align:center;padding:6px 0 10px">
-        <button class="btn pr" style="font-size:12px" onclick="retryCamera()">🔄 Skúsiť znova</button>
+        <button class="btn pr" style="font-size:12px" onclick="retryCam()">🔄 Skúsiť znova</button>
         <div style="font-size:11px;color:var(--text3);margin-top:6px">Nastavenia → Chrome → Povolenia → Kamera → Povoliť</div>
       </div>
-
-      <!-- Manuálny vstup VČM + spresnenie -->
-      <div class="card" style="margin-top:12px">
+      <div class="card" style="margin-top:10px">
         <div class="card-title">Zadaj manuálne</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <input type="text" id="manual-vcm" placeholder="VČM (napr. VCM-001)" autocomplete="off"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:11px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none;text-transform:uppercase">
-          <input type="text" id="manual-rnu" placeholder="RNU (voliteľné)" autocomplete="off"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:11px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
-          <input type="text" id="manual-sar" placeholder="Šarža (voliteľné)" autocomplete="off"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:11px 12px;font-size:14px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
-          <button class="btn pr full" onclick="onManualVcm()" style="padding:12px">Hľadať</button>
+          <input class="inp upper" id="manual-vcm" placeholder="VČM (napr. VCM-001)" autocomplete="off">
+          <input class="inp" id="manual-rnu" placeholder="RNU (voliteľné)" autocomplete="off">
+          <input class="inp" id="manual-sar" placeholder="Šarža (voliteľné)" autocomplete="off">
+          <button class="btn pr full" onclick="onManualVcm()">Hľadať</button>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:8px">VČM je povinné · RNU a šarža pomôžu ak má viac položiek rovnaké VČM</div>
       </div>
-
-      <!-- Stav inventúry -->
       <div class="card">
-        <div class="card-title">Aktuálny stav</div>
+        <div class="card-title">Stav inventúry</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
           <div class="sum-box ok"><div class="sn" id="cnt-ok">0</div><div class="sl">Sedí</div></div>
           <div class="sum-box warn"><div class="sn" id="cnt-over">0</div><div class="sl">Prebytok</div></div>
           <div class="sum-box err"><div class="sn" id="cnt-under">0</div><div class="sl">Chýba</div></div>
         </div>
-        <!-- Čakajúce položky -->
-        <div id="pending-list-wrap" style="display:none;margin-bottom:12px">
-          <div style="font-size:10px;color:var(--text3);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Ešte neskontrolované</div>
-          <div id="pending-list" style="max-height:160px;overflow-y:auto;border-radius:var(--r);background:var(--bg3);border:1px solid var(--border)"></div>
-          <button class="btn full" style="margin-top:6px;font-size:11px;color:var(--text3)" onclick="togglePendingList()">Skryť zoznam</button>
+        <div id="pending-wrap" style="display:none;margin-bottom:10px">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Neskontrolované</div>
+          <div id="pending-list" style="max-height:160px;overflow-y:auto;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border)"></div>
+          <button class="btn full" style="margin-top:6px;font-size:11px;color:var(--text3)" onclick="togglePending()">Skryť</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <button class="btn full" onclick="togglePendingList()" style="font-size:12px">📋 Čo zostáva</button>
+          <button class="btn full" onclick="togglePending()" style="font-size:12px">📋 Čo zostáva</button>
           <button class="btn pr full" onclick="goResults()">Výsledky</button>
         </div>
         <button class="btn full" onclick="zalohaExport()" style="font-size:11px;color:var(--text3)">💾 Zálohovať priebeh</button>
       </div>
     </div>
 
-    <!-- ═══════════ SCREEN: ITEM ═══════════ -->
+    <!-- ITEM -->
     <div class="screen" id="s-item">
       <div class="scan-header">
         <button class="back-btn" onclick="goScan()">← Skenovať</button>
         <div>
-          <div class="scan-title">Kontrola položky</div>
-          <div style="font-size:11px;color:var(--text3)" id="item-progress-label"></div>
+          <div style="font-size:15px;font-weight:600;color:var(--text)">Kontrola položky</div>
+          <div style="font-size:11px;color:var(--text3)" id="item-prog"></div>
         </div>
       </div>
-
-      <!-- Karta položky -->
       <div class="item-card" id="item-card">
         <div class="item-vcm" id="item-vcm"></div>
         <div class="item-name" id="item-name"></div>
         <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <span class="tag info" id="item-typ"></span>
           <span class="tag" id="item-zmj" style="background:var(--bg3);color:var(--text2)"></span>
-          <span class="tag" id="item-sklad-tag" style="background:var(--bg3);color:var(--text3)"></span>
+          <span class="tag" id="item-sklad" style="background:var(--bg3);color:var(--text3)"></span>
         </div>
-        <!-- Detaily RNU / Šarža ak existujú -->
-        <div id="item-details" style="font-size:11px;color:var(--text3);margin-bottom:10px;display:none"></div>
+        <div id="item-det" style="font-size:11px;color:var(--text3);margin-bottom:10px;display:none"></div>
         <div class="counts-grid">
-          <div class="count-box exp">
-            <div class="cn" id="exp-qty">0</div>
-            <div class="cl">Evidencia</div>
-          </div>
-          <div class="count-box act" id="act-box">
-            <div class="cn" id="act-qty">–</div>
-            <div class="cl">Skutočnosť</div>
-          </div>
+          <div class="count-box exp"><div class="cn" id="exp-qty">0</div><div class="cl">Evidencia</div></div>
+          <div class="count-box act" id="act-box"><div class="cn" id="act-qty">–</div><div class="cl">Skutočnosť</div></div>
         </div>
         <div class="diff-row" id="diff-row" style="display:none">
-          <span class="dl">Rozdiel</span>
+          <span style="font-size:12px;color:var(--text3)">Rozdiel</span>
           <span class="dv" id="diff-val">–</span>
         </div>
       </div>
-
-      <!-- RÝCHLY MÓD — primárna akcia -->
+      <!-- Rýchly mód -->
       <div id="quick-mode">
-        <button class="quick-sedi" onclick="quickSedi()"
-          onpointerdown="this.style.transform='scale(0.97)'"
-          onpointerup="this.style.transform=''"
-          onpointerleave="this.style.transform=''">
+        <button class="quick-sedi" id="btn-sedi" onclick="quickSedi()">
           <span style="font-size:28px">✓</span>
-          <div>
-            <div>SEDÍ</div>
-            <div class="qs-exp" id="qs-exp-label"></div>
-          </div>
+          <div><div>SEDÍ</div><div style="font-size:13px;font-weight:400;opacity:0.8" id="sedi-label"></div></div>
         </button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <button class="quick-iny" onclick="openNumpad()">✏️ Iný počet</button>
-          <button class="quick-iny" style="color:var(--amber);border-color:var(--amber)" onclick="confirmItem(true)">⏭ Preskočiť</button>
+          <button class="quick-iny" style="color:var(--amber);border-color:var(--amber)" onclick="skipItem()">⏭ Preskočiť</button>
         </div>
       </div>
-
-      <!-- NUMPAD — skrytý, otvorí sa pri "Iný počet" -->
+      <!-- Numpad -->
       <div class="numpad-wrap" id="numpad-wrap">
         <div class="card" style="margin-top:10px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -434,55 +299,42 @@ canvas#qr-canvas{display:none}
           </div>
           <div class="numpad-display" id="np-display">–</div>
           <div class="numpad">
-            <button class="np-btn" onclick="np('1')">1</button>
-            <button class="np-btn" onclick="np('2')">2</button>
-            <button class="np-btn" onclick="np('3')">3</button>
-            <button class="np-btn" onclick="np('4')">4</button>
-            <button class="np-btn" onclick="np('5')">5</button>
-            <button class="np-btn" onclick="np('6')">6</button>
-            <button class="np-btn" onclick="np('7')">7</button>
-            <button class="np-btn" onclick="np('8')">8</button>
-            <button class="np-btn" onclick="np('9')">9</button>
-            <button class="np-btn del" onclick="npDel()">⌫</button>
-            <button class="np-btn zero" onclick="np('0')">0</button>
+            <button class="np-btn" onclick="np('1')">1</button><button class="np-btn" onclick="np('2')">2</button><button class="np-btn" onclick="np('3')">3</button>
+            <button class="np-btn" onclick="np('4')">4</button><button class="np-btn" onclick="np('5')">5</button><button class="np-btn" onclick="np('6')">6</button>
+            <button class="np-btn" onclick="np('7')">7</button><button class="np-btn" onclick="np('8')">8</button><button class="np-btn" onclick="np('9')">9</button>
+            <button class="np-btn del" onclick="npDel()">⌫</button><button class="np-btn zero" onclick="np('0')">0</button>
           </div>
-          <div class="action-row">
-            <button class="btn am full" onclick="confirmItem(true)">⏭ Preskočiť</button>
-            <button class="btn ok full" id="btn-confirm" onclick="confirmItem(false)" disabled>✓ Potvrdiť</button>
+          <div class="action-row" style="margin-bottom:8px">
+            <button class="btn am full" onclick="skipItem()">⏭ Preskočiť</button>
+            <button class="btn ok full" id="btn-confirm" onclick="confirmCount()" disabled>✓ Potvrdiť</button>
           </div>
-          <div id="btn-reopen-wrap" style="display:none;margin-top:8px">
-            <button class="btn full" style="font-size:12px;color:var(--amber);border-color:var(--amber)" onclick="reopenItem()">✏️ Opraviť zadaný počet</button>
+          <div id="reopen-wrap" style="display:none">
+            <button class="btn full" style="font-size:12px;color:var(--amber);border-color:var(--amber)" onclick="reopenItem()">✏️ Opraviť</button>
           </div>
         </div>
       </div>
-
       <!-- Poznámka -->
       <div class="card" style="margin-top:10px">
         <div class="card-title">Poznámka (voliteľné)</div>
         <div style="display:flex;gap:8px">
-          <input type="text" id="item-note" placeholder="napr. poškodené 2 ks, iná séria..."
-            autocomplete="off"
-            style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;font-size:13px;font-family:var(--font);color:var(--text);outline:none;-webkit-appearance:none"
-            oninput="saveItemNote(this.value)">
-          <button class="btn" onclick="clearItemNote()" style="font-size:12px;color:var(--text3);flex-shrink:0">✕</button>
+          <input class="inp" id="item-note" placeholder="napr. poškodené 2 ks, iná séria..." oninput="saveNote(this.value)" style="flex:1">
+          <button class="btn" onclick="clearNote()" style="font-size:12px;color:var(--text3);flex-shrink:0">✕</button>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:5px" id="note-saved-hint"></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:5px" id="note-hint"></div>
       </div>
     </div>
 
-    <!-- ═══════════ SCREEN: RESULTS ═══════════ -->
+    <!-- RESULTS -->
     <div class="screen" id="s-results">
       <div class="scan-header">
         <button class="back-btn" onclick="goScan()">← Pokračovať</button>
-        <div class="scan-title">Výsledky inventúry</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text)">Výsledky inventúry</div>
       </div>
-
       <div class="summary-grid">
         <div class="sum-box ok"><div class="sn" id="r-ok">0</div><div class="sl">Sedí</div></div>
         <div class="sum-box warn"><div class="sn" id="r-over">0</div><div class="sl">Prebytok</div></div>
         <div class="sum-box err"><div class="sn" id="r-under">0</div><div class="sl">Chýba</div></div>
       </div>
-
       <div class="filter-row">
         <button class="fb active" id="fb-all" onclick="setFilter('all')">Všetky</button>
         <button class="fb" id="fb-err" onclick="setFilter('err')">❌ Chýba</button>
@@ -491,142 +343,59 @@ canvas#qr-canvas{display:none}
         <button class="fb" id="fb-skip" onclick="setFilter('skip')">⏭ Preskočené</button>
         <button class="fb" id="fb-new" onclick="setFilter('new')">+ Navyše</button>
       </div>
-
-      <div class="card" style="padding:0;overflow:hidden">
-        <div id="results-list"></div>
+      <div class="card" style="padding:0;overflow:hidden"><div id="results-list"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+        <button class="btn full" onclick="exportJSON()">💾 JSON</button>
+        <button class="btn pr full" onclick="exportReport()">📄 Report PDF</button>
       </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
-        <button class="btn full" onclick="exportReport('json')">💾 Export JSON</button>
-        <button class="btn pr full" onclick="exportPDF(INV)">📄 Export PDF (tento sklad)</button>
-      </div>
-      <button class="btn full" style="margin-top:8px;color:var(--accent);border-color:var(--accent)" onclick="openSync()">🔄 Synchronizovať s iným tabletom</button>
+      <button class="btn full" style="margin-top:8px;color:var(--accent);border-color:var(--accent)" onclick="openSync()">🔄 Synchronizovať</button>
       <button class="btn ok full" style="margin-top:8px" onclick="askFinish()">🏁 Ďalší sklad / Ukončiť</button>
     </div>
 
   </div>
 </div>
 
-<!-- MODAL: Synchronizácia medzi tabletmi -->
-<div class="mo" id="mo-sync">
+<!-- MODALS -->
+<div class="mo" id="mo-uvit">
   <div class="mo-box">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="margin:0">🔄 Synchronizácia</h2>
-      <button class="btn" style="padding:6px 12px;font-size:12px" onclick="closeMo('mo-sync')">✕</button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div style="font-size:32px">📦</div>
+      <div><h2 style="margin:0 0 2px;font-size:16px" id="uvit-name"></h2><div style="font-family:var(--mono);font-size:12px;color:var(--text3)" id="uvit-id"></div></div>
     </div>
-
-    <!-- Exportuj QR -->
-    <div style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">📤 Odoslať na iný tablet</div>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Vyber sklad ktorý chceš preniesť — druhý tablet ho naskenuje a zlúči s jeho dátami.</p>
-      <select id="sync-sklad-select" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:9px 10px;font-size:13px;color:var(--text);font-family:var(--font);margin-bottom:10px"></select>
-      <button class="btn pr full" onclick="syncGenerateQR()">Vygenerovať QR kód</button>
-      <div id="sync-qr-wrap" style="display:none;margin-top:12px;text-align:center">
-        <div style="background:#fff;border-radius:var(--r);padding:12px;display:inline-block;margin-bottom:8px">
-          <div id="sync-qr-canvas"></div>
-        </div>
-        <div style="font-size:11px;color:var(--text3)">Druhý tablet naskenuje tento QR kód</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:4px" id="sync-qr-info"></div>
-      </div>
-    </div>
-
-    <!-- Importuj QR -->
-    <div style="background:var(--bg3);border-radius:var(--r);padding:14px">
-      <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">📥 Prijať z iného tabletu</div>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Naskenuj QR kód z iného tabletu — výsledky sa zlúčia.</p>
-      <button class="btn ok full" onclick="closeMo('mo-sync');startSyncScan()">📷 Skenovať QR z iného tabletu</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Uvítanie skladu -->
-<div class="mo" id="mo-sklad-uvit">
-  <div class="mo-box">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-      <div style="font-size:36px">📦</div>
-      <div>
-        <h2 style="margin:0 0 3px;font-size:16px" id="mo-uvit-name"></h2>
-        <div style="font-family:var(--mono);font-size:12px;color:var(--text3)" id="mo-uvit-id"></div>
-      </div>
-    </div>
-    <div id="mo-uvit-stats" style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:16px;font-size:13px;line-height:2"></div>
-    <div id="mo-uvit-last" style="font-size:11px;color:var(--text3);margin-bottom:16px"></div>
+    <div id="uvit-stats" style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px"></div>
+    <div id="uvit-last" style="font-size:11px;color:var(--text3);margin-bottom:14px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button class="btn full" onclick="closeMo('mo-sklad-uvit');goWelcome()">← Späť</button>
-      <button class="btn pr full" id="mo-uvit-btn" onclick="closeMo('mo-sklad-uvit');doGoScan()">▶ Spustiť</button>
+      <button class="btn full" onclick="closeMo('mo-uvit');goWelcome()">← Späť</button>
+      <button class="btn pr full" id="uvit-btn">▶ Spustiť</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL: Sklad bez dát -->
 <div class="mo" id="mo-no-data">
   <div class="mo-box">
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:36px;margin-bottom:8px">⚠️</div>
-      <h2 style="margin:0 0 4px">Sklad načítaný</h2>
-      <div style="font-size:18px;font-weight:700;color:var(--accent)" id="mo-sklad-name"></div>
-      <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-top:3px" id="mo-sklad-id"></div>
-    </div>
-    <div style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:16px;font-size:13px;color:var(--text2);line-height:1.8">
-      Pre tento sklad <span style="color:var(--amber);font-weight:600">nebol nájdený zoznam položiek</span>.<br><br>
-      <span style="color:var(--text3);font-size:12px">
-        Postup:<br>
-        1. PC → NSE Evidencia → Sklady → vyber sklad<br>
-        2. Klikni <span style="color:var(--green);font-weight:600">↓ Export pre inventúru</span><br>
-        3. Nahraj JSON tu (úvodná obrazovka)<br>
-        4. Naskenuj QR kód skladu znova
-      </span>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button class="btn full" onclick="closeMo('mo-no-data')">Zavrieť</button>
-      <button class="btn am full" onclick="startEmptyInv()">Skenovať bez zoznamu</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Položka už skontrolovaná -->
-<div class="mo" id="mo-already">
-  <div class="mo-box">
-    <h2>Položka už skontrolovaná</h2>
-    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px">
-      <div style="font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:3px" id="mo-already-vcm"></div>
-      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px" id="mo-already-name"></div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:2px" id="mo-already-stav"></div>
-      <div style="font-size:12px;color:var(--text3)" id="mo-already-qty"></div>
-    </div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Chceš opraviť zadaný počet?</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button class="btn full" onclick="closeMo('mo-already');resumeScan()">Nie, pokračovať</button>
-      <button class="btn am full" onclick="closeMo('mo-already');reopenItem()">✏️ Opraviť</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Potvrdenie nulového počtu -->
-<div class="mo" id="mo-zero">
-  <div class="mo-box">
     <div style="text-align:center;margin-bottom:14px">
-      <div style="font-size:36px;margin-bottom:8px">⚠️</div>
-      <h2 style="margin:0 0 6px">Zadávate 0 kusov</h2>
-      <div style="font-size:13px;color:var(--text2)" id="mo-zero-name"></div>
+      <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+      <h2 style="margin:0 0 4px">Sklad načítaný</h2>
+      <div style="font-size:18px;font-weight:700;color:var(--accent)" id="nd-name"></div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--text3);margin-top:3px" id="nd-id"></div>
     </div>
-    <div style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:13px;color:var(--red)">
-      Položka <strong>fyzicky chýba</strong> v sklade. Bude vyznačená v reporte ako "Chýba celá".
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px;font-size:13px;color:var(--text2);line-height:1.8">
+      Pre tento sklad <span style="color:var(--amber);font-weight:600">nebol nájdený zoznam položiek</span>.<br>
+      <span style="font-size:12px;color:var(--text3)">1. NSE Evidencia → Sklady → vyber sklad<br>2. Klikni ↓ Export pre inventúru<br>3. Nahraj JSON tu<br>4. Naskenuj QR znova</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <button class="btn full" onclick="closeMo('mo-zero')">← Opraviť počet</button>
-      <button class="btn dr full" onclick="closeMo('mo-zero');doConfirmItem()">Áno, 0 kusov</button>
+      <button class="btn full" onclick="closeMo('mo-no-data');goWelcome()">Zavrieť</button>
+      <button class="btn am full" onclick="closeMo('mo-no-data');startEmptyInv()">Skenovať bez zoznamu</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL: Neznámy VČM -->
 <div class="mo" id="mo-unknown">
   <div class="mo-box">
-    <h2>Neznámy VČM</h2>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Tento kód nie je v zozname inventúry:</p>
-    <div style="font-family:var(--mono);padding:10px 12px;background:var(--bg3);border-radius:var(--r);margin-bottom:8px;color:var(--amber);font-size:13px;word-break:break-all" id="mo-unknown-vcm"></div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:12px;word-break:break-all;line-height:1.6" id="mo-unknown-diag"></div>
+    <h2>Neznámy kód</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Tento kód nie je v zozname:</p>
+    <div style="font-family:var(--mono);padding:10px 12px;background:var(--bg3);border-radius:var(--r);margin-bottom:8px;color:var(--amber);font-size:13px;word-break:break-all" id="unk-vcm"></div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:14px;word-break:break-all" id="unk-diag"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button class="btn full" onclick="closeMo('mo-unknown');resumeScan()">Ignorovať</button>
       <button class="btn am full" onclick="addExtra()">+ Zaznamenať navyše</button>
@@ -634,116 +403,121 @@ canvas#qr-canvas{display:none}
   </div>
 </div>
 
-<!-- MODAL: Ďalší sklad / Ukončiť inventúru -->
+<div class="mo" id="mo-already">
+  <div class="mo-box">
+    <h2>Už skontrolované</h2>
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
+      <div style="font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:3px" id="alr-vcm"></div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px" id="alr-name"></div>
+      <div style="font-size:13px;font-weight:700" id="alr-stav"></div>
+      <div style="font-size:12px;color:var(--text3)" id="alr-qty"></div>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Chceš opraviť zadaný počet?</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn full" onclick="closeMo('mo-already');resumeScan()">Nie</button>
+      <button class="btn am full" onclick="closeMo('mo-already');reopenItem()">✏️ Opraviť</button>
+    </div>
+  </div>
+</div>
+
+<div class="mo" id="mo-zero">
+  <div class="mo-box">
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+      <h2 style="margin:0 0 6px">Zadávate 0 kusov</h2>
+      <div style="font-size:13px;color:var(--text2)" id="zero-name"></div>
+    </div>
+    <div style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--r);padding:12px;margin-bottom:14px;font-size:13px;color:var(--red)">
+      Položka <strong>fyzicky chýba</strong> v sklade.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn full" onclick="closeMo('mo-zero')">← Opraviť</button>
+      <button class="btn dr full" onclick="closeMo('mo-zero');doConfirm()">Áno, 0 kusov</button>
+    </div>
+  </div>
+</div>
+
 <div class="mo" id="mo-finish">
   <div class="mo-box">
     <h2 style="margin-bottom:6px">Sklad dokončený ✓</h2>
-    <div id="mo-finish-stats" style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:13px;line-height:1.8"></div>
-
-    <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px">📦 POKRAČOVAŤ — ďalší sklad</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Naskenuj QR kód ďalšieho skladu a pokračuj v inventúre.</div>
-      <button class="btn pr full" onclick="continueNextSklad()">📷 Načítať ďalší sklad</button>
+    <div id="fin-stats" style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px;font-size:13px;line-height:2"></div>
+    <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);border-radius:var(--r);padding:12px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:6px">📦 Pokračovať — ďalší sklad</div>
+      <button class="btn pr full" onclick="continueNext()">📷 Načítať ďalší sklad</button>
     </div>
-
-    <div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);border-radius:var(--r);padding:14px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">🏁 UKONČIŤ — vygenerovať PDF</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Spojí výsledky <strong id="mo-finish-inv-count">všetkých</strong> skladov do jedného PDF reportu.</div>
-      <button class="btn ok full" onclick="finishAllAndPDF()">📄 Ukončiť a vygenerovať PDF</button>
+    <div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);border-radius:var(--r);padding:12px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px">🏁 Ukončiť — vygenerovať report</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Spojí výsledky <span id="fin-count">všetkých</span> skladov do jedného PDF.</div>
+      <button class="btn ok full" onclick="finishAll()">📄 Ukončiť a vygenerovať PDF</button>
     </div>
+    <button class="btn full" onclick="closeMo('mo-finish')" style="font-size:12px;color:var(--text3)">Späť</button>
+  </div>
+</div>
 
-    <button class="btn full" onclick="closeMo('mo-finish')" style="font-size:12px;color:var(--text3)">Späť — pokračovať v tomto sklade</button>
+<div class="mo" id="mo-sync">
+  <div class="mo-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="margin:0">🔄 Synchronizácia</h2>
+      <button class="btn" style="padding:6px 12px;font-size:12px" onclick="closeMo('mo-sync')">✕</button>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">📤 Odoslať na iný tablet</div>
+      <select id="sync-sel" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:9px 10px;font-size:13px;color:var(--text);font-family:var(--font);margin-bottom:10px"></select>
+      <button class="btn pr full" onclick="syncGenQR()">Vygenerovať QR kód</button>
+      <div id="sync-qr-wrap" style="display:none;margin-top:12px;text-align:center">
+        <div style="background:#fff;border-radius:var(--r);padding:12px;display:inline-block;margin-bottom:6px"><div id="sync-qr-canvas"></div></div>
+        <div style="font-size:11px;color:var(--text3)" id="sync-qr-info"></div>
+      </div>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">📥 Prijať z iného tabletu</div>
+      <button class="btn ok full" onclick="closeMo('mo-sync');startSyncScan()">📷 Skenovať QR</button>
+    </div>
   </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// ZVUK — Web Audio API (funguje offline, bez súborov)
-// ═══════════════════════════════════════════════════════
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-let _audioCtx = null;
-
-function getAudioCtx(){
-  if(!_audioCtx) try{ _audioCtx = new AudioCtx(); }catch(e){}
-  return _audioCtx;
-}
-
-// Pípnutie: freq=frekvencia Hz, dur=trvanie s, type=tvar vlny
-function beep(freq, dur, type='sine', vol=0.3){
-  const ctx = getAudioCtx();
-  if(!ctx) return;
+// ═══ AUDIO ═══════════════════════════════════════════
+let _ac = null;
+function ac(){ if(!_ac) try{_ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){} return _ac; }
+function beep(f,d,t='sine',v=0.25){
+  const c=ac(); if(!c) return;
   try{
-    // Obnov ak je suspended (mobilné prehliadače)
-    if(ctx.state === 'suspended') ctx.resume();
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type      = type;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(vol, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + dur);
+    if(c.state==='suspended') c.resume();
+    const o=c.createOscillator(), g=c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.type=t; o.frequency.value=f;
+    g.gain.setValueAtTime(v,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+d);
+    o.start(); o.stop(c.currentTime+d);
   }catch(e){}
 }
+function sndOK(){ beep(880,0.08);setTimeout(()=>beep(1100,0.12),90); }
+function sndErr(){ beep(220,0.35,'square',0.15); }
+function sndWarn(){ beep(660,0.1);setTimeout(()=>beep(440,0.15),110); }
+function sndScan(){ beep(1200,0.05,void 0,0.15); }
+function flash(t){ const e=document.createElement('div'); e.className='flash '+t; document.body.appendChild(e); setTimeout(()=>e.remove(),450); }
+document.addEventListener('touchstart',()=>ac(),{once:true});
+document.addEventListener('click',()=>ac(),{once:true});
 
-function soundOK(){
-  beep(880, 0.08, 'sine', 0.25);
-  setTimeout(()=>beep(1100, 0.12, 'sine', 0.2), 90);
-}
+// ═══ STATE ════════════════════════════════════════════
+let DB   = JSON.parse(localStorage.getItem('nse_inv_db')||'[]');
+let INV  = null;
+let ITEM = null;
+let npVal= '';
+let scanning=false, vidStream=null, scanTmr=null, lastRaw='', lastTime=0, curFilter='all';
+let _syncScanMode=false;
 
-function flashScreen(type){
-  const old = document.querySelector('.scan-flash');
-  if(old) old.remove();
-  const el = document.createElement('div');
-  el.className = 'scan-flash ' + type;
-  document.body.appendChild(el);
-  setTimeout(()=>el.remove(), 450);
-}
+function saveDB(){ localStorage.setItem('nse_inv_db',JSON.stringify(DB)); }
 
-function soundError(){
-  // Hlboké dlhé pípnutie — chýba/rozdiel
-  beep(220, 0.35, 'square', 0.15);
-}
-
-function soundWarning(){
-  // Stredné dvojité — prebytok
-  beep(660, 0.1, 'sine', 0.2);
-  setTimeout(()=>beep(440, 0.15, 'sine', 0.15), 110);
-}
-
-function soundScan(){
-  // Krátke kliknutie — úspešný sken QR
-  beep(1200, 0.05, 'sine', 0.15);
-}
-
-// Inicializuj audio kontext pri prvom dotyku (iOS vyžaduje user gesture)
-document.addEventListener('touchstart', ()=>getAudioCtx(), {once:true});
-document.addEventListener('click', ()=>getAudioCtx(), {once:true});
-
-// ═══════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════
-let DB       = JSON.parse(localStorage.getItem('nse_inv_db') || '[]'); // pole inventúr
-let INV      = null;   // aktuálna inventúra
-let ITEM     = null;   // aktuálna položka
-let npVal    = '';     // numpad hodnota
-let scanning = false;
-let stream   = null;
-let scanTmr  = null;
-let lastRaw  = '';
-let lastTime = 0;
-let filter   = 'all';
-
-// ═══════════════════════════════════════════════════════
-// SCREENS
-// ═══════════════════════════════════════════════════════
+// ═══ SCREENS ══════════════════════════════════════════
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function openMo(id){ document.getElementById(id).classList.add('open'); }
+function closeMo(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeMo(m.id);}));
 
 function goWelcome(){
-  stopCam();
-  INV = null;
+  stopCam(); INV=null;
   show('s-welcome');
   document.getElementById('topbar-badge').style.display='none';
   renderList();
@@ -751,517 +525,234 @@ function goWelcome(){
 
 function goScan(){
   if(!INV) return;
-  doGoScan();
+  show('s-scan');
+  document.getElementById('scan-title').textContent = INV.skladName||INV.name;
+  document.getElementById('scan-sub').textContent   = INV.skladId+' · '+INV.items.length+' položiek';
+  document.getElementById('topbar-badge').textContent = INV.skladId;
+  document.getElementById('topbar-badge').style.display='block';
+  updateProg(); updateCounts(); startCam();
 }
 
 function goItem(item){
-  stopCam();
-  ITEM  = item;
-  npVal = '';
-  show('s-item');
-  renderItem();
+  stopCam(); ITEM=item; npVal='';
+  show('s-item'); renderItem();
 }
 
 function goResults(){
-  stopCam();
-  show('s-results');
-  renderSummary();
-  renderResults();
+  stopCam(); show('s-results');
+  renderSummary(); renderResults();
 }
 
-// ═══════════════════════════════════════════════════════
-// WELCOME / IMPORT
-// ═══════════════════════════════════════════════════════
-function saveDB(){ localStorage.setItem('nse_inv_db', JSON.stringify(DB)); }
-
-// ── SYNCHRONIZÁCIA MEDZI TABLETMI ─────────────────────
-function openSync(){
-  // Naplň select skladov
-  const sel = document.getElementById('sync-sklad-select');
-  sel.innerHTML = DB.map((inv,i)=>`<option value="${i}">${inv.skladName||inv.skladId} (${inv.items.filter(x=>x.scanned||x.skipped).length}/${inv.items.length})</option>`).join('');
-  document.getElementById('sync-qr-wrap').style.display='none';
-  openMo('mo-sync');
-}
-
-function syncGenerateQR(){
-  const idx = parseInt(document.getElementById('sync-sklad-select').value);
-  const inv = DB[idx];
-  if(!inv){ toast('Vyber sklad','warn'); return; }
-
-  // Skomprimuj — len scanned/skipped/extra položky
-  const payload = {
-    t:   'NSE_SYNC',
-    v:   '1',
-    sid: inv.skladId,
-    snm: inv.skladName,
-    dt:  inv.date,
-    its: inv.items.filter(x=>x.scanned||x.skipped||x.isExtra).map(it=>({
-      v:  it.vcm||'',
-      id: it.itemId||'',
-      aq: it.actualQty,
-      sc: it.scanned?1:0,
-      sk: it.skipped?1:0,
-      ex: it.isExtra?1:0,
-      nt: it.note||''
-    }))
-  };
-
-  const json = JSON.stringify(payload);
-  const infoEl = document.getElementById('sync-qr-info');
-  const wrap   = document.getElementById('sync-qr-canvas');
-  document.getElementById('sync-qr-wrap').style.display = 'block';
-
-  // Príliš veľa dát pre QR
-  if(json.length > 2800){
-    wrap.innerHTML = '';
-    infoEl.innerHTML = '⚠ Príliš veľa dát pre QR (<strong>'+json.length+'</strong> znakov, limit 2800).<br>Použi <strong>💾 Zálohovať priebeh</strong> a pošli JSON súbor druhému tabletu.';
-    infoEl.style.color = 'var(--amber)';
-    return;
-  }
-
-  wrap.innerHTML = '<div style="padding:16px;font-size:12px;color:#888;text-align:center">⏳ Generujem QR kód...</div>';
-  infoEl.textContent = '';
-
-  // Funkcia ktorá skutočne vygeneruje QR
-  const doGenerate = () => {
-    wrap.innerHTML = '';
-    try{
-      new QRCode(wrap, {
-        text: json,
-        width: 220, height: 220,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.L
-      });
-      infoEl.textContent = json.length+' znakov · '+payload.its.length+' položiek skontrolovaných';
-      infoEl.style.color = 'var(--text3)';
-    }catch(e){
-      wrap.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--red)">Chyba: '+e.message+'</div>';
-    }
-  };
-
-  // Ak je knižnica ready — generuj hneď
-  if(window._qrCodeReady && typeof QRCode !== 'undefined'){
-    doGenerate();
-    return;
-  }
-
-  // Ak ešte nie je načítaná — načítaj znova a čakaj
-  infoEl.textContent = 'Načítavam knižnicu...';
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-  script.onload = () => {
-    window._qrCodeReady = true;
-    doGenerate();
-  };
-  script.onerror = () => {
-    // Offline fallback — zobraz text namiesto QR
-    wrap.innerHTML = '';
-    const pre = document.createElement('div');
-    pre.style.cssText = 'font-family:monospace;font-size:9px;word-break:break-all;padding:10px;background:#f3f4f6;border-radius:6px;max-height:120px;overflow-y:auto;color:#111';
-    pre.textContent = json;
-    wrap.appendChild(pre);
-    // Ulož json do globálnej premennej pre kopírovanie
-    window._syncJson = json;
-    infoEl.innerHTML = '⚠ Offline — QR knižnica nie je dostupná. Použi <strong>💾 Zálohovať priebeh</strong> a pošli JSON súbor druhému tabletu.<br><button onclick="if(navigator.clipboard){navigator.clipboard.writeText(window._syncJson||\'\')" style="margin-top:6px;padding:4px 10px;font-size:11px;cursor:pointer;border-radius:4px;border:1px solid #ccc;background:#fff">📋 Kopírovať JSON</button>';
-    infoEl.style.color = 'var(--amber)';
-  };
-  document.head.appendChild(script);
-}
-
-let _syncScanMode = false;
-function startSyncScan(){
-  _syncScanMode = true;
-  lastRaw = '';
-  // Použi scan screen v sync móde
-  show('s-scan');
-  document.getElementById('scan-title').textContent = 'Skenuj QR z iného tabletu';
-  document.getElementById('scan-sub').textContent   = 'Priblíž kameru ku QR kódu na druhom tablete';
-  document.getElementById('topbar-badge').style.display='none';
-  document.getElementById('prog-bar').style.width='0%';
-  document.getElementById('prog-label').textContent='Čakám na sync QR kód...';
-  startCam();
-}
-
-function processSyncQR(payload){
-  _syncScanMode = false;
-  stopCam();
-
-  try{
-    const p = typeof payload === 'string' ? JSON.parse(payload) : payload;
-    if(p.t !== 'NSE_SYNC') throw new Error('Nie je sync QR');
-
-    // Nájdi inventúru pre tento sklad
-    const invIdx = DB.findIndex(i=>i.skladId===p.sid);
-    if(invIdx < 0){
-      toast('Sklad '+p.sid+' nie je importovaný — najprv importuj JSON','err');
-      goWelcome(); return;
-    }
-
-    const inv = DB[invIdx];
-    let merged = 0, conflicts = 0;
-
-    // Zlúč položky — druhý tablet mohol skenovať iné položky
-    p.its.forEach(syncIt=>{
-      const local = inv.items.find(x=>
-        (syncIt.id && x.itemId===syncIt.id) ||
-        (syncIt.v  && x.vcm===syncIt.v)
-      );
-      if(!local) return;
-
-      if(syncIt.sc && !local.scanned){
-        // Druhý tablet naskenoval túto položku, my nie — preberieme
-        local.actualQty = syncIt.aq;
-        local.scanned   = true;
-        local.skipped   = false;
-        if(syncIt.nt) local.note = syncIt.nt;
-        merged++;
-      } else if(syncIt.sc && local.scanned && syncIt.aq !== local.actualQty){
-        // Obaja skenovali — conflict, necháme lokálnu hodnotu
-        conflicts++;
-      } else if(syncIt.sk && !local.scanned && !local.skipped){
-        local.skipped = true;
-        merged++;
-      }
-    });
-
-    saveDB();
-    const msg = merged>0
-      ? '✓ Zlúčených '+merged+' položiek'+(conflicts>0?' ('+conflicts+' konfliktov — zachovaná lokálna hodnota)':'')
-      : 'Žiadne nové dáta na zlúčenie'+(conflicts>0?' ('+conflicts+' konfliktov)':'');
-    toast(msg, merged>0?'ok':'warn');
-    INV = DB[invIdx];
-    showSkladUvit();
-  }catch(e){
-    toast('Neplatný sync QR kód','err');
-    goWelcome();
-  }
-}
-
-// ── ZÁLOHA PRIEBEHU ──────────────────────────────────
-function zalohaExport(){
-  if(!DB.length){ toast('Žiadne dáta na zálohu','warn'); return; }
-  const zaloha = {
-    type:    'NSE_INVENTURA_ZALOHA',
-    version: '1.0',
-    saved:   new Date().toISOString(),
-    db:      DB
-  };
-  const name = 'inventura_zaloha_'+new Date().toISOString().slice(0,16).replace('T','_').replace(':','-')+'.json';
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(zaloha,null,2)],{type:'application/json'}));
-  a.download = name; a.click(); URL.revokeObjectURL(a.href);
-  toast('Záloha uložená: '+name,'ok');
-}
-
-document.addEventListener('DOMContentLoaded', ()=>{
-  const fz = document.getElementById('file-zaloha');
-  if(fz) fz.addEventListener('change', function(e){
-    const f = e.target.files[0]; if(!f) return;
-    const r = new FileReader();
-    r.onload = ev => {
-      try{
-        const data = JSON.parse(ev.target.result);
-        if(data.type === 'NSE_INVENTURA_ZALOHA' && data.db){
-          if(!confirm('Obnoviť zálohu z '+new Date(data.saved).toLocaleString('sk-SK')+'?\nAktuálne dáta budú nahradené.')) return;
-          DB = data.db;
-          saveDB();
-          renderList();
-          toast('Záloha obnovená — '+DB.length+' skladov','ok');
-        } else if(data.db){
-          DB = data.db; saveDB(); renderList(); toast('Záloha obnovená','ok');
-        } else {
-          toast('Neplatný súbor zálohy','err');
-        }
-      }catch{ toast('Neplatný súbor','err'); }
-    };
-    r.readAsText(f); this.value='';
-  });
-});
-
+// ═══ WELCOME / IMPORT ════════════════════════════════
 function renderList(){
-  const el = document.getElementById('inv-list');
-  const active = DB.filter(i=>!i.finished);
-  const done   = DB.filter(i=>i.finished);
-  const all    = [...active, ...done];
-  if(!all.length){
-    el.innerHTML='<p style="color:var(--text3);font-size:13px;text-align:center;padding:14px 0">Zatiaľ žiadne dáta.<br>Importuj JSON zo skladu nižšie.</p>';
-    return;
-  }
-  el.innerHTML = all.map((inv,_i)=>{
-    const origIdx = DB.indexOf(inv);
-    const total = inv.items.length;
-    const checked = inv.items.filter(x=>x.scanned||x.skipped).length;
-    const ok  = inv.items.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
-    const err = inv.items.filter(x=>x.scanned&&x.actualQty!==x.expectedQty).length;
-    const pct = total ? Math.round(checked/total*100) : 0;
-    const badge = inv.finished
-      ? '<span class="tag ok" style="font-size:10px">✓ Dokončená</span>'
-      : checked===0 ? '<span class="tag info" style="font-size:10px">Čaká</span>'
-      : '<span class="tag warn" style="font-size:10px">Prebieha</span>';
-    const diffStr = (checked>0||inv.finished)
-      ? `<span style="color:var(--green);font-size:11px">✓${ok}</span> ${err>0?`<span style="color:var(--red);font-size:11px">✗${err}</span>`:''}` : '';
-    return `<div class="inv-card" onclick="openInv(${origIdx})">
-      <div class="ic-body">
+  const el=document.getElementById('inv-list');
+  if(!DB.length){ el.innerHTML='<p style="color:var(--text3);font-size:13px;text-align:center;padding:14px 0">Žiadne dáta. Importuj JSON zo skladu.</p>'; return; }
+  const sorted=[...DB].sort((a,b)=>(a.finished?1:0)-(b.finished?1:0));
+  el.innerHTML=sorted.map(inv=>{
+    const i=DB.indexOf(inv);
+    const tot=inv.items.length, done=inv.items.filter(x=>x.scanned||x.skipped).length;
+    const ok=inv.items.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
+    const err=inv.items.filter(x=>x.scanned&&x.actualQty!==x.expectedQty).length;
+    const pct=tot?Math.round(done/tot*100):0;
+    const badge=inv.finished?'<span class="tag ok" style="font-size:10px">✓ Dokončená</span>':done===0?'<span class="tag info" style="font-size:10px">Čaká</span>':'<span class="tag warn" style="font-size:10px">Prebieha</span>';
+    return `<div class="inv-card" onclick="openInv(${i})">
+      <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
-          <div class="ic-name">${inv.skladName||inv.name}</div>${badge}
+          <div style="font-size:14px;font-weight:600;color:var(--text)">${inv.skladName||inv.name}</div>${badge}
         </div>
-        <div class="ic-meta" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="font-family:var(--mono);color:var(--accent);font-size:11px">${inv.skladId}</span>
-          <span>${checked}/${total}</span>${diffStr}<span>${inv.date}</span>
+        <div style="font-size:11px;color:var(--text3);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-family:var(--mono);color:var(--accent)">${inv.skladId}</span>
+          <span>${done}/${tot}</span>
+          ${done>0?`<span style="color:var(--green)">✓${ok}</span>${err>0?`<span style="color:var(--red)">✗${err}</span>`:''}` :''}
+          <span>${inv.date}</span>
         </div>
         <div class="pbar-wrap"><div class="pbar" style="width:${pct}%;background:${inv.finished?'var(--green)':'var(--accent)'}"></div></div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
-        <div class="ic-arrow">›</div>
-        <button onclick="event.stopPropagation();delInv(${origIdx})" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;padding:2px">🗑</button>
+        <span style="color:var(--text3);font-size:18px">›</span>
+        <button onclick="event.stopPropagation();delInv(${i})" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;padding:2px">🗑</button>
       </div>
     </div>`;
   }).join('');
 }
 
-function openInv(i){ INV = DB[i]; showSkladUvit(); }
+function openInv(i){ INV=DB[i]; showUvit(); }
+function delInv(i){ if(!confirm('Odstrániť?')) return; DB.splice(i,1); saveDB(); renderList(); toast('Odstránené','info'); }
 
-function showSkladUvit(){
+function showUvit(){
   if(!INV) return;
-  const total   = INV.items.length;
-  const checked = INV.items.filter(x=>x.scanned||x.skipped).length;
-  const ok      = INV.items.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
-  const err     = INV.items.filter(x=>x.scanned&&x.actualQty!==x.expectedQty&&x.scanned).length;
-  const skip    = INV.items.filter(x=>x.skipped).length;
-  const notDone = INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-  const pct     = total ? Math.round(checked/total*100) : 0;
-
-  document.getElementById('mo-uvit-name').textContent = INV.skladName || INV.name;
-  document.getElementById('mo-uvit-id').textContent   = INV.skladId;
-
-  const statsHTML = `
+  const tot=INV.items.length, done=INV.items.filter(x=>x.scanned||x.skipped).length;
+  const ok=INV.items.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
+  const err=INV.items.filter(x=>x.scanned&&x.actualQty!==x.expectedQty&&x.scanned).length;
+  const notDone=INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+  const pct=tot?Math.round(done/tot*100):0;
+  document.getElementById('uvit-name').textContent=INV.skladName||INV.name;
+  document.getElementById('uvit-id').textContent=INV.skladId;
+  document.getElementById('uvit-stats').innerHTML=`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
-      <div style="text-align:center">
-        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent)">${total}</div>
-        <div style="font-size:10px;color:var(--text3)">Celkom</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--green)">${ok}</div>
-        <div style="font-size:10px;color:var(--text3)">Sedí</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:${err>0?'var(--red)':'var(--text3)'}">${err}</div>
-        <div style="font-size:10px;color:var(--text3)">Rozdiel</div>
-      </div>
+      <div style="text-align:center"><div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent)">${tot}</div><div style="font-size:10px;color:var(--text3)">Celkom</div></div>
+      <div style="text-align:center"><div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--green)">${ok}</div><div style="font-size:10px;color:var(--text3)">Sedí</div></div>
+      <div style="text-align:center"><div style="font-size:22px;font-weight:700;font-family:var(--mono);color:${err>0?'var(--red)':'var(--text3)'}">${err}</div><div style="font-size:10px;color:var(--text3)">Rozdiel</div></div>
     </div>
-    <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:8px">
-      <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':'var(--accent)'};border-radius:2px"></div>
-    </div>
-    <div style="font-size:12px;color:var(--text2);text-align:center">${checked}/${total} skontrolovaných (${pct}%)</div>
-    ${notDone>0?`<div style="font-size:12px;color:var(--amber);text-align:center;margin-top:4px">Zostáva: ${notDone} položiek</div>`:''}
-    ${skip>0?`<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:2px">Preskočené: ${skip}</div>`:''}
-  `;
-  document.getElementById('mo-uvit-stats').innerHTML = statsHTML;
-
-  const lastEl = document.getElementById('mo-uvit-last');
-  lastEl.textContent = INV.finishedDate
-    ? 'Dokončená: ' + INV.finishedDate
-    : INV.date ? 'Importovaná: ' + INV.date : '';
-
-  const btn = document.getElementById('mo-uvit-btn');
-  if(INV.finished){
-    btn.textContent = '📋 Zobraziť výsledky';
-    btn.onclick = ()=>{ closeMo('mo-sklad-uvit'); doGoScan(); setTimeout(goResults,100); };
-  } else if(checked===0){
-    btn.textContent = '▶ Začať inventúru';
-    btn.onclick = ()=>{ closeMo('mo-sklad-uvit'); doGoScan(); };
-  } else {
-    btn.textContent = '▶ Pokračovať ('+notDone+' zostáva)';
-    btn.onclick = ()=>{ closeMo('mo-sklad-uvit'); doGoScan(); };
-  }
-
-  openMo('mo-sklad-uvit');
+    <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:6px"><div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':'var(--accent)'};border-radius:2px"></div></div>
+    <div style="font-size:12px;color:var(--text2);text-align:center">${done}/${tot} skontrolovaných (${pct}%)${notDone>0?' · zostáva '+notDone:''}</div>`;
+  document.getElementById('uvit-last').textContent=INV.finishedDate?'Dokončená: '+INV.finishedDate:INV.date?'Importovaná: '+INV.date:'';
+  const btn=document.getElementById('uvit-btn');
+  if(INV.finished){ btn.textContent='📋 Zobraziť výsledky'; btn.onclick=()=>{closeMo('mo-uvit');goScan();setTimeout(goResults,100);}; }
+  else if(done===0){ btn.textContent='▶ Začať inventúru'; btn.onclick=()=>{closeMo('mo-uvit');goScan();}; }
+  else{ btn.textContent='▶ Pokračovať ('+notDone+' zostáva)'; btn.onclick=()=>{closeMo('mo-uvit');goScan();}; }
+  openMo('mo-uvit');
 }
 
-function doGoScan(){
-  if(!INV) return;
-  show('s-scan');
-  document.getElementById('scan-title').textContent = INV.skladName || INV.name;
-  document.getElementById('scan-sub').textContent   = INV.skladId + ' · ' + INV.items.length + ' položiek';
-  document.getElementById('topbar-badge').textContent = INV.skladId;
-  document.getElementById('topbar-badge').style.display = 'block';
-  updateProg(); updateCounts(); startCam();
-}
-
-function delInv(i){
-  if(!confirm('Odstrániť inventúru pre ' + (DB[i].skladName||DB[i].skladId) + '?')) return;
-  DB.splice(i,1); saveDB(); renderList(); toast('Odstránené','info');
-}
-
-// File input
-document.getElementById('file-inp').addEventListener('change', function(e){
-  const f = e.target.files[0]; if(!f) return;
-  const r = new FileReader();
-  r.onload = ev => { try{ importJSON(JSON.parse(ev.target.result)); } catch{ toast('Neplatný JSON súbor','err'); } };
+// File inputs
+document.getElementById('file-inp').addEventListener('change',function(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{try{importJSON(JSON.parse(ev.target.result));}catch(err){toast('Neplatný JSON súbor','err');}};
   r.readAsText(f); this.value='';
+});
+document.getElementById('file-zaloha').addEventListener('change',function(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(d.type==='NSE_INVENTURA_ZALOHA'&&d.db){
+        if(!confirm('Obnoviť zálohu z '+new Date(d.saved).toLocaleString('sk-SK')+'?\nAktuálne dáta budú nahradené.')) return;
+        DB=d.db; saveDB(); renderList(); toast('Záloha obnovená','ok');
+      } else toast('Neplatný súbor zálohy','err');
+    }catch{toast('Neplatný súbor','err');}
+  };
+  r.readAsText(f); this.value='';
+});
+document.getElementById('qr-photo').addEventListener('change',function(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=function(ev){
+    const img=new Image();
+    img.onload=async function(){
+      const cv=document.getElementById('qr-canvas');
+      cv.width=img.width; cv.height=img.height;
+      const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0);
+      let found=false;
+      if('BarcodeDetector' in window){
+        try{ const codes=await new BarcodeDetector({formats:['qr_code']}).detect(img);
+          if(codes&&codes.length){found=true;onQR(codes[0].rawValue);} }catch(e){}
+      }
+      if(!found&&window._jsQRReady&&typeof jsQR==='function'){
+        const id=ctx.getImageData(0,0,cv.width,cv.height);
+        const code=jsQR(id.data,id.width,id.height,{inversionAttempts:'attemptBoth'});
+        if(code&&code.data){found=true;onQR(code.data);}
+      }
+      if(!found){setStatus('❌ QR sa nenašiel – skús znova','error');}
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(f); this.value='';
 });
 
 function importJSON(data){
-  let items=[], skladId='', skladName='', invName='';
-
-  if(Array.isArray(data)){ items=data; }
-  else if(data.items){ items=data.items; }
-  else { toast('Neplatná štruktúra JSON súboru','err'); return; }
-
-  // Podpora pre NSE_INVENTURA_IMPORT v2.0 (nový formát z Evidencie)
-  if(data.type === 'NSE_INVENTURA_IMPORT'){
-    skladId   = data.sklad    || '';
-    skladName = data.skladName || data.name || skladId;
-    invName   = 'Inventúra – ' + skladName;
+  let items=[],skladId='',skladName='',invName='';
+  if(Array.isArray(data)){items=data;}
+  else if(data.items){items=data.items;}
+  else{toast('Neplatná štruktúra JSON','err');return;}
+  if(data.type==='NSE_INVENTURA_IMPORT'||data.type==='NSE_INVENTURA_ZALOHA'&&data.db){
+    // záloha
+    if(data.db){DB=data.db;saveDB();renderList();toast('Záloha obnovená','ok');return;}
+    skladId=data.sklad||''; skladName=data.skladName||data.name||skladId; invName='Inventúra – '+skladName;
   } else {
-    // Starší formát alebo manuálny JSON
-    skladId   = data.sklad || data.skladId || '';
-    skladName = data.skladName || data.name || skladId;
-    invName   = data.name || 'Inventúra – ' + skladName;
+    skladId=data.sklad||data.skladId||''; skladName=data.skladName||data.name||skladId; invName=data.name||'Inventúra – '+skladName;
   }
-
-  if(!items.length){ toast('Súbor neobsahuje žiadne položky','err'); return; }
-  if(!skladId){ toast('Chýba ID skladu v súbore — importujem bez väzby na QR','warn'); }
-
-  const inv = {
-    id:        skladId ? 'INV-'+skladId : 'INV-'+Date.now(),
-    name:      invName || 'Inventúra',
-    skladId:   skladId,
-    skladName: skladName,
-    date:      new Date().toLocaleDateString('sk-SK'),
-    finished:  false,
-    items: items.map(it=>({
-      // itemId = interné ID z Evidencie — QR kód položky ho obsahuje
-      itemId:      it.id   || '',
-      // VČM ako záloha (ak QR kód neobsahuje itemId)
-      vcm:         (it.vcm || it.VCM || '').toString().toUpperCase(),
-      // Názov — Evidencia používa "nazov" (bez diakritiky v kľúči)
-      name:        it.nazov || it.name || it.vcm || '–',
-      typ:         it.typ   || 'Zásoby',
-      zmj:         it.zmj   || 'ks',
-      zt:          it.zt    || '',
-      kat:         it.kat   || '',
-      rnu:         it.rnu   || '',
-      sarza:       it.sarza || '',
-      cisloMat:    it.cisloMat || '',
-      expectedQty: Number(it.qty || it.expectedQty || 0),
-      actualQty:   null,
-      scanned:     false,
-      skipped:     false,
-      isExtra:     false
+  if(!items.length){toast('Súbor neobsahuje položky','err');return;}
+  if(!skladId) toast('Chýba ID skladu','warn');
+  const inv={
+    id:skladId?'INV-'+skladId:'INV-'+Date.now(),name:invName,skladId,skladName,
+    date:new Date().toLocaleDateString('sk-SK'),finished:false,
+    items:items.map(it=>({
+      itemId:it.id||'',vcm:(it.vcm||it.VCM||'').toString().toUpperCase(),
+      name:it.nazov||it.name||it.vcm||'–',typ:it.typ||'Zásoby',
+      zmj:it.zmj||'ks',zt:it.zt||'',kat:it.kat||'',rnu:it.rnu||'',
+      sarza:it.sarza||'',cisloMat:it.cisloMat||'',evCislo:it.evCislo||'',
+      expectedQty:Number(it.qty||it.expectedQty||0),
+      actualQty:null,scanned:false,skipped:false,isExtra:false,note:''
     }))
   };
-
-  // Prepis ak existuje nedokončená pre rovnaký sklad — zachovaj postup
-  const ex = DB.findIndex(i=>i.skladId===skladId&&!i.finished);
+  const ex=DB.findIndex(i=>i.skladId===skladId&&!i.finished);
   if(ex>=0){
-    const oldInv = DB[ex];
-    inv.items = inv.items.map(ni=>{
-      // Hľadaj zhodu podľa itemId, potom VČM
-      const oi = oldInv.items.find(x=>(ni.itemId && x.itemId===ni.itemId)||(ni.vcm && x.vcm===ni.vcm));
-      return oi ? {...ni, actualQty:oi.actualQty, scanned:oi.scanned, skipped:oi.skipped} : ni;
+    const oi=DB[ex];
+    inv.items=inv.items.map(ni=>{
+      const o=oi.items.find(x=>(ni.itemId&&x.itemId===ni.itemId)||(ni.vcm&&x.vcm===ni.vcm));
+      return o?{...ni,actualQty:o.actualQty,scanned:o.scanned,skipped:o.skipped,note:o.note||''}:ni;
     });
-    DB[ex] = inv;
-    toast('Sklad '+skladName+' aktualizovaný ('+items.length+' pol.)','info');
+    DB[ex]=inv; toast('Sklad '+skladName+' aktualizovaný ('+items.length+' pol.)','info');
   } else {
-    DB.push(inv);
-    toast('✓ Načítaných '+items.length+' položiek – '+skladName,'ok');
+    DB.push(inv); toast('✓ '+items.length+' položiek – '+skladName,'ok');
   }
   saveDB(); renderList();
 }
 
-function loadDemo(){
-  importJSON({
-    name:'Demo – Sklad 2', sklad:'SK-02', skladName:'Sklad 2',
-    items:[
-      {vcm:'VCM-001',name:'Kábel 230V/16A 5m',typ:'DHM',zmj:'ks',qty:12},
-      {vcm:'VCM-002',name:'Poistka 10A',typ:'Zásoby',zmj:'ks',qty:50},
-      {vcm:'VCM-003',name:'Rukavice pracovné L',typ:'Zásoby',zmj:'pár',qty:8},
-      {vcm:'VCM-004',name:'Merač napätia DT-830',typ:'DHM',zmj:'ks',qty:3},
-      {vcm:'VCM-005',name:'Páska izolačná čierna',typ:'Zásoby',zmj:'ks',qty:20},
-      {vcm:'VCM-006',name:'Predlžovák 10m',typ:'DHM',zmj:'ks',qty:5},
-      {vcm:'VCM-007',name:'LED žiarovka E27 10W',typ:'Zásoby',zmj:'ks',qty:30},
-      {vcm:'VCM-008',name:'Skrutkovač sada 6ks',typ:'DHM',zmj:'sada',qty:4},
-    ]
-  });
+function zalohaExport(){
+  if(!DB.length){toast('Žiadne dáta','warn');return;}
+  const z={type:'NSE_INVENTURA_ZALOHA',version:'1.0',saved:new Date().toISOString(),db:DB};
+  dlFile('inventura_zaloha_'+new Date().toISOString().slice(0,16).replace('T','_').replace(/:/g,'-')+'.json',JSON.stringify(z,null,2),'application/json');
+  toast('Záloha uložená','ok');
 }
 
-// ═══════════════════════════════════════════════════════
-// SCAN SCREEN
-// ═══════════════════════════════════════════════════════
+// ═══ SCAN ═════════════════════════════════════════════
 function updateProg(){
   if(!INV) return;
-  const total   = INV.items.length;
-  const checked = INV.items.filter(x=>x.scanned||x.skipped).length;
-  const pct     = total ? Math.round(checked/total*100) : 0;
-  document.getElementById('prog-bar').style.width   = pct+'%';
-  document.getElementById('prog-label').textContent = checked+' / '+total+' skontrolovaných ('+pct+'%)';
+  const tot=INV.items.length, done=INV.items.filter(x=>x.scanned||x.skipped).length;
+  const pct=tot?Math.round(done/tot*100):0;
+  document.getElementById('prog-bar').style.width=pct+'%';
+  document.getElementById('prog-label').textContent=done+' / '+tot+' skontrolovaných ('+pct+'%)';
 }
-
 function updateCounts(){
   if(!INV) return;
-  const sc = INV.items.filter(x=>x.scanned&&x.actualQty!==null);
-  document.getElementById('cnt-ok').textContent    = sc.filter(x=>x.actualQty===x.expectedQty).length;
-  document.getElementById('cnt-over').textContent  = sc.filter(x=>x.actualQty>x.expectedQty).length;
-  document.getElementById('cnt-under').textContent = sc.filter(x=>x.actualQty<x.expectedQty).length;
+  const sc=INV.items.filter(x=>x.scanned&&x.actualQty!==null);
+  document.getElementById('cnt-ok').textContent=sc.filter(x=>x.actualQty===x.expectedQty).length;
+  document.getElementById('cnt-over').textContent=sc.filter(x=>x.actualQty>x.expectedQty).length;
+  document.getElementById('cnt-under').textContent=sc.filter(x=>x.actualQty<x.expectedQty).length;
 }
-
 function startSkladScan(){
-  INV = null;
-  show('s-scan');
-  document.getElementById('scan-title').textContent = 'Naskenuj QR kód skladu';
-  document.getElementById('scan-sub').textContent   = 'Priblíž tablet ku QR kódu na dverách';
+  INV=null; show('s-scan');
+  document.getElementById('scan-title').textContent='Naskenuj QR kód skladu';
+  document.getElementById('scan-sub').textContent='Priblíž tablet ku QR kódu na dverách';
   document.getElementById('topbar-badge').style.display='none';
   document.getElementById('prog-bar').style.width='0%';
   document.getElementById('prog-label').textContent='Čakám na QR kód skladu...';
   ['cnt-ok','cnt-over','cnt-under'].forEach(id=>document.getElementById(id).textContent='–');
   startCam();
 }
+function setStatus(txt,cls=''){
+  const el=document.getElementById('cam-status');
+  el.textContent=txt; el.className='cam-status'+(cls?' '+cls:'');
+}
 
-// ═══════════════════════════════════════════════════════
-// CAMERA
-// ═══════════════════════════════════════════════════════
+// ═══ CAMERA ═══════════════════════════════════════════
 async function startCam(){
-  const video = document.getElementById('qr-video');
-  const st    = document.getElementById('cam-status');
-  const retry = document.getElementById('cam-retry');
-  const fb    = document.getElementById('photo-fb');
-
-  video.style.display='block'; fb.style.display='none';
-  retry.style.display='none';
+  const video=document.getElementById('qr-video');
+  const fb=document.getElementById('photo-fb');
+  const retry=document.getElementById('cam-retry');
+  video.style.display='block'; fb.style.display='none'; retry.style.display='none';
   document.querySelector('.cam-overlay').style.display='flex';
-  st.textContent='⏳ Spúšťam kameru...'; st.className='cam-status';
+  setStatus('⏳ Spúšťam kameru...');
 
-  const hasAPI = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  // Secure context check: https alebo lokálna sieť
-  const isSecure = location.protocol==='https:'
-    || location.hostname==='localhost'
-    || /^192\.168\./.test(location.hostname)
-    || /^10\./.test(location.hostname)
-    || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(location.hostname);
+  const hasAPI=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+  const isSecure=location.protocol==='https:'||location.hostname==='localhost'||/^192\.168\./.test(location.hostname)||/^10\./.test(location.hostname)||/^172\.(1[6-9]|2[0-9]|3[01])\./.test(location.hostname);
 
-  if(!hasAPI || !isSecure){ showPhotoFb(); return; }
+  if(!hasAPI||!isSecure){showPhotoFb();return;}
 
-  const tryStart = async (c) => {
-    const s = await navigator.mediaDevices.getUserMedia({video:c});
-    stream = s;
-    video.setAttribute('playsinline','true');
-    video.muted=true;
-    video.srcObject=s;
-    await video.play();
-    scanning=true;
-    const bdAvail = 'BarcodeDetector' in window;
-    st.textContent = bdAvail ? '🔍 Hľadám QR kód...' : '🔍 Hľadám QR kód... (načítavam dekodér)';
-    st.className='cam-status pulsing';
-    runScan();
+  const tryStart=async(c)=>{
+    const s=await navigator.mediaDevices.getUserMedia({video:c});
+    vidStream=s; video.setAttribute('playsinline','true'); video.muted=true; video.srcObject=s;
+    await video.play(); scanning=true;
+    setStatus('🔍 Hľadám QR kód...','pulsing'); runScan();
   };
-
-  try { await tryStart({facingMode:{exact:'environment'},width:{ideal:1280},height:{ideal:720}}); }
-  catch(e1){ try { await tryStart({facingMode:'environment'}); }
-  catch(e2){ try { await tryStart(true); }
+  try{await tryStart({facingMode:{exact:'environment'},width:{ideal:1280},height:{ideal:720}});}
+  catch(e1){try{await tryStart({facingMode:'environment'});}
+  catch(e2){try{await tryStart(true);}
   catch(e3){
-    if(e3.name==='NotAllowedError'){ st.textContent='🔒 Kamera zamietnutá – klepni Skúsiť znova'; st.className='cam-status error'; retry.style.display='block'; }
+    if(e3.name==='NotAllowedError'){setStatus('🔒 Kamera zamietnutá','error');document.getElementById('cam-retry').style.display='block';}
     else showPhotoFb();
   }}}
 }
@@ -1270,1095 +761,454 @@ function showPhotoFb(){
   document.getElementById('qr-video').style.display='none';
   document.querySelector('.cam-overlay').style.display='none';
   document.getElementById('photo-fb').style.display='flex';
-  document.getElementById('cam-status').textContent='Odfot QR kód tlačidlom vyššie';
-  document.getElementById('cam-status').className='cam-status';
+  setStatus('Odfot QR kód tlačidlom vyššie');
 }
 
 function stopCam(){
   scanning=false;
-  if(scanTmr){ clearInterval(scanTmr); scanTmr=null; }
-  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
-  const fb=document.getElementById('photo-fb');
-  if(fb) fb.style.display='none';
-  const v=document.getElementById('qr-video');
-  v.style.display='block';
-  const ov=document.querySelector('.cam-overlay');
-  if(ov) ov.style.display='flex';
+  if(scanTmr){clearInterval(scanTmr);scanTmr=null;}
+  if(vidStream){vidStream.getTracks().forEach(t=>t.stop());vidStream=null;}
+  document.getElementById('photo-fb').style.display='none';
+  document.getElementById('qr-video').style.display='block';
+  const ov=document.querySelector('.cam-overlay'); if(ov) ov.style.display='flex';
 }
 
-function retryCamera(){ startCam(); }
+function retryCam(){startCam();}
 
 async function runScan(){
-  const video = document.getElementById('qr-video');
-  const canvas = document.getElementById('qr-canvas');
-  const ctx = canvas.getContext('2d');
+  const video=document.getElementById('qr-video');
+  const cv=document.getElementById('qr-canvas');
+  const ctx=cv.getContext('2d');
+  const hasBD='BarcodeDetector' in window;
+  let bd=null;
+  if(hasBD) try{bd=new BarcodeDetector({formats:['qr_code']});}catch(e){}
 
-  // BarcodeDetector — natívne API v Chrome Android (bez knižníc, offline)
-  const hasBD = ('BarcodeDetector' in window);
-  let detector = null;
-  if(hasBD){
-    try{
-      detector = new BarcodeDetector({formats:['qr_code']});
-      document.getElementById('cam-status').textContent = '🔍 Hľadám QR kód...';
-    }catch(e){ detector = null; }
-  }
+  const bdAvail=hasBD&&location.protocol==='https:'||hasBD&&/^192\.168\./.test(location.hostname)||hasBD&&location.hostname==='localhost';
+  setStatus('🔍 Hľadám QR kód...','pulsing');
 
-  const tryDecode = async () => {
-    if(!scanning || video.readyState !== video.HAVE_ENOUGH_DATA) return;
-
-    // Metóda 1: BarcodeDetector (Chrome Android, offline, rýchly)
-    if(detector){
-      try{
-        const codes = await detector.detect(video);
-        if(codes && codes.length > 0){
-          const raw = codes[0].rawValue;
-          const now = Date.now();
-          if(raw && (raw !== lastRaw || now - lastTime > 3000)){
-            lastRaw = raw; lastTime = now; onQR(raw);
-          }
-        }
-        return;
-      }catch(e){ detector = null; } // BarcodeDetector zlyhal, prejdi na jsQR
+  scanTmr=setInterval(async()=>{
+    if(!scanning||video.readyState!==video.HAVE_ENOUGH_DATA) return;
+    if(bd){
+      try{const codes=await bd.detect(video);if(codes&&codes.length){const r=codes[0].rawValue,n=Date.now();if(r!==lastRaw||n-lastTime>3000){lastRaw=r;lastTime=n;onQR(r);}return;}}catch(e){bd=null;}
     }
-
-    // Metóda 2: jsQR (ak je načítaný z CDN)
-    if(window._jsQRReady && typeof jsQR === 'function'){
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      try{
-        const code = jsQR(id.data, id.width, id.height, {inversionAttempts:'dontInvert'});
-        if(code && code.data){
-          const raw = code.data, now = Date.now();
-          if(raw !== lastRaw || now - lastTime > 3000){ lastRaw = raw; lastTime = now; onQR(raw); }
-        }
-      }catch(e){}
-      return;
+    if(window._jsQRReady&&typeof jsQR==='function'){
+      cv.width=video.videoWidth;cv.height=video.videoHeight;ctx.drawImage(video,0,0);
+      try{const code=jsQR(ctx.getImageData(0,0,cv.width,cv.height).data,cv.width,cv.height,{inversionAttempts:'dontInvert'});
+        if(code&&code.data){const r=code.data,n=Date.now();if(r!==lastRaw||n-lastTime>3000){lastRaw=r;lastTime=n;onQR(r);}}}catch(e){}
     }
-
-    // Žiadna metóda nie je dostupná
-    if(!hasBD && !window._jsQRReady){
-      document.getElementById('cam-status').textContent = '⚠️ QR dekodér sa načítava... (potrebný internet)';
-    }
-  };
-
-  scanTmr = setInterval(tryDecode, 200);
+  },200);
 }
 
-// Photo fallback
-document.getElementById('qr-photo').addEventListener('change',function(e){
-  const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=function(ev){
-    const img=new Image();
-    img.onload=async function(){
-      const canvas=document.getElementById('qr-canvas');
-      canvas.width=img.width; canvas.height=img.height;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(img,0,0);
-      let found = false;
-
-      // Skús BarcodeDetector
-      if('BarcodeDetector' in window){
-        try{
-          const bd = new BarcodeDetector({formats:['qr_code']});
-          const codes = await bd.detect(img);
-          if(codes && codes.length > 0){
-            found = true;
-            document.getElementById('cam-status').className='cam-status active';
-            onQR(codes[0].rawValue);
-          }
-        }catch(e){}
-      }
-
-      // Fallback na jsQR
-      if(!found && window._jsQRReady && typeof jsQR==='function'){
-        const id=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code=jsQR(id.data,id.width,id.height,{inversionAttempts:'attemptBoth'});
-        if(code&&code.data){ found=true; document.getElementById('cam-status').className='cam-status active'; onQR(code.data); }
-      }
-
-      if(!found){
-        document.getElementById('cam-status').textContent='❌ QR sa nenašiel – skús znova';
-        document.getElementById('cam-status').className='cam-status error';
-      }
-    };
-    img.src=ev.target.result;
-  };
-  r.readAsDataURL(f); this.value='';
-});
-
-// ═══════════════════════════════════════════════════════
-// QR LOGIKA
-// ═══════════════════════════════════════════════════════
+// ═══ QR LOGIKA ════════════════════════════════════════
 function parseQR(raw){
   raw=raw.trim();
   try{
     const o=JSON.parse(raw);
-    // QR kód skladu
-    if(o.type==='NSE_SKLAD') return {type:'sklad', id:o.id, name:o.name};
-    // Sync QR medzi tabletmi
-    if(o.t==='NSE_SYNC') return {type:'sync', raw:raw};
-    // QR kód položky — nový formát s viacerými atribútmi
-    if(o.t==='NSE_ITEM') return {
-      type: 'item',
-      id:   o.id  || '',
-      vcm:  o.vcm || '',
-      rnu:  o.rnu || '',
-      sar:  o.sar || '',
-      evc:  o.evc || '',
-      dmc:  o.dmc || ''
-    };
-    // Starý formát — len VČM alebo ID
-    return {type:'item', id:o.id||'', vcm:(o.vcm||o.VCM||''), rnu:'', sar:'', evc:'', dmc:''};
-  }catch{
-    // Plain string — VČM alebo ID
-    return {type:'item', id:'', vcm:raw, rnu:'', sar:'', evc:'', dmc:''};
-  }
+    if(o.type==='NSE_SKLAD') return {type:'sklad',id:o.id,name:o.name};
+    if(o.t==='NSE_SYNC') return {type:'sync',raw};
+    if(o.t==='NSE_ITEM') return {type:'item',id:o.id||'',vcm:o.vcm||'',rnu:o.rnu||'',sar:o.sar||'',evc:o.evc||'',dmc:o.dmc||''};
+    return {type:'item',id:o.id||'',vcm:(o.vcm||o.VCM||''),rnu:'',sar:'',evc:'',dmc:''};
+  }catch{return {type:'item',id:'',vcm:raw,rnu:'',sar:'',evc:'',dmc:''};}
 }
 
 function onQR(raw){
   const p=parseQR(raw);
-  const st=document.getElementById('cam-status');
-  if(p.type==='sync'){
-    soundScan();
-    st.textContent='✓ Sync QR načítaný'; st.className='cam-status active';
-    processSyncQR(raw);
-    return;
-  }
-  if(p.type==='sklad'){
-    soundScan();
-    st.textContent='✓ Sklad: '+p.name; st.className='cam-status active';
-    onSkladQR(p.id, p.name);
-  } else {
-    soundScan();
-    const label = p.vcm || p.id || raw;
-    st.textContent='✓ '+label; st.className='cam-status active';
-    lookupItem(p);
-  }
+  if(p.type==='sklad'){sndScan();setStatus('✓ Sklad: '+p.name,'active');onSkladQR(p.id,p.name);}
+  else if(p.type==='sync'){sndScan();setStatus('✓ Sync QR','active');processSyncQR(raw);}
+  else{sndScan();setStatus('✓ '+(p.vcm||p.id),'active');lookupItem(p);}
 }
 
-function onSkladQR(id, name){
+function onSkladQR(id,name){
   stopCam();
-  const found = DB.find(i=>i.skladId===id&&!i.finished);
-  if(found){ INV=found; showSkladUvit(); return; }
-  const foundFinished = DB.find(i=>i.skladId===id&&i.finished);
-  if(foundFinished){ INV=foundFinished; showSkladUvit(); return; }
-  document.getElementById('mo-sklad-name').textContent=name;
-  document.getElementById('mo-sklad-id').textContent=id;
-  // Ulož ID pre prípad "Skenovať bez zoznamu"
-  document.getElementById('mo-sklad-id').dataset.id=id;
-  document.getElementById('mo-sklad-name').dataset.name=name;
+  const found=DB.find(i=>i.skladId===id&&!i.finished);
+  if(found){INV=found;showUvit();return;}
+  const fin=DB.find(i=>i.skladId===id&&i.finished);
+  if(fin){INV=fin;showUvit();return;}
+  document.getElementById('nd-name').textContent=name;
+  document.getElementById('nd-id').textContent=id;
+  document.getElementById('nd-id').dataset.id=id;
+  document.getElementById('nd-name').dataset.name=name;
   openMo('mo-no-data');
 }
 
 function startEmptyInv(){
-  closeMo('mo-no-data');
-  const id   = document.getElementById('mo-sklad-id').dataset.id   || 'SK-?';
-  const name = document.getElementById('mo-sklad-name').dataset.name || id;
-  const inv  = { id:'INV-'+Date.now(), name:'Inventúra – '+name, skladId:id, skladName:name,
-    date:new Date().toLocaleDateString('sk-SK'), finished:false, items:[] };
-  DB.push(inv); saveDB();
-  INV=inv; goScan();
+  const id=document.getElementById('nd-id').dataset.id||'SK-?';
+  const name=document.getElementById('nd-name').dataset.name||id;
+  const inv={id:'INV-'+Date.now(),name:'Inventúra – '+name,skladId:id,skladName:name,date:new Date().toLocaleDateString('sk-SK'),finished:false,items:[]};
+  DB.push(inv);saveDB();INV=inv;goScan();
 }
 
-// Hľadá položku podľa kombinácie identifikačných atribútov z QR kódu
-// VČM môže byť rovnaké pre viac položiek — preto kombinujeme RNU, šaržu, ev.číslo
 function lookupItem(p){
-  if(!INV){ toast('Najprv naskenuj QR kód skladu','warn'); return; }
+  if(!INV){toast('Najprv naskenuj QR kód skladu','warn');return;}
+  const norm=s=>(s||'').trim().toLowerCase();
+  const vcm=norm(p.vcm),rnu=norm(p.rnu),sar=norm(p.sar),evc=norm(p.evc),id=norm(p.id);
 
-  const norm = s => (s||'').trim().toLowerCase();
-  const vcm  = norm(p.vcm);
-  const rnu  = norm(p.rnu);
-  const sar  = norm(p.sar);
-  const evc  = norm(p.evc);
-  const dmc  = norm(p.dmc);
-  const id   = norm(p.id);
-
-  // Skórovacie hľadanie — čím viac atribútov sedí, tým lepšia zhoda
-  let best = null, bestScore = 0;
-
-  // Najprv skontroluj či položka nebola už skontrolovaná
-  const alreadyDone = INV.items.find(x=>{
+  // Už skontrolovaná?
+  const done=INV.items.find(x=>{
     if(!x.scanned) return false;
-    const s = x.itemId && norm(x.itemId)===id ? true
-      : vcm && norm(x.vcm)===vcm && (!rnu||norm(x.rnu)===rnu) && (!sar||norm(x.sarza)===sar) ? true : false;
-    return s;
+    return (id&&norm(x.itemId)===id)||(vcm&&norm(x.vcm)===vcm&&(!rnu||norm(x.rnu)===rnu)&&(!sar||norm(x.sarza)===sar));
   });
-  if(alreadyDone){
-    // Položka už bola skontrolovaná — ponúkni opravu
-    stopCam();
-    ITEM = alreadyDone;
-    const diff = alreadyDone.actualQty - alreadyDone.expectedQty;
-    const stavTxt = diff===0 ? '✓ Sedí' : diff>0 ? '▲ Prebytok +'+diff : '▼ Chýba '+diff;
-    document.getElementById('mo-already-vcm').textContent = alreadyDone.vcm||alreadyDone.itemId||'–';
-    document.getElementById('mo-already-name').textContent = alreadyDone.name;
-    document.getElementById('mo-already-stav').textContent = stavTxt;
-    document.getElementById('mo-already-stav').style.color = diff===0?'var(--green)':diff>0?'var(--amber)':'var(--red)';
-    document.getElementById('mo-already-qty').textContent = alreadyDone.actualQty+' '+alreadyDone.zmj+' (evidencia: '+alreadyDone.expectedQty+')';
-    openMo('mo-already');
-    return;
+  if(done){
+    ITEM=done; stopCam();
+    const diff=done.actualQty-done.expectedQty;
+    document.getElementById('alr-vcm').textContent=done.vcm||done.itemId||'–';
+    document.getElementById('alr-name').textContent=done.name;
+    document.getElementById('alr-stav').textContent=diff===0?'✓ Sedí':diff>0?'▲ Prebytok +'+diff:'▼ Chýba '+diff;
+    document.getElementById('alr-stav').style.color=diff===0?'var(--green)':diff>0?'var(--amber)':'var(--red)';
+    document.getElementById('alr-qty').textContent=done.actualQty+' '+done.zmj+' (evidencia: '+done.expectedQty+')';
+    openMo('mo-already');return;
   }
 
+  let best=null,bestScore=0;
   for(const x of INV.items){
-    if(x.scanned && x.actualQty !== null) continue;
-
-    let score = 0;
-
-    // Zhoda podľa interného ID (presná, najspoľahlivejšia)
-    if(id && norm(x.itemId) === id){ score += 100; }
-
-    // Zhoda podľa VČM
-    if(vcm && norm(x.vcm) === vcm) score += 10;
-
-    // Zhoda podľa RNU (ak je zadané v QR aj v zozname)
-    if(rnu && norm(x.rnu) === rnu) score += 20;
-
-    // Zhoda podľa šarže
-    if(sar && norm(x.sarza) === sar) score += 20;
-
-    // Zhoda podľa evidenčného čísla
-    if(evc && norm(x.evCislo) === evc) score += 30;
-
-    // Zhoda podľa DM čísla
-    if(dmc && norm(x.cisloMat) === dmc) score += 30;
-
-    if(score > bestScore){ bestScore = score; best = x; }
+    if(x.scanned&&x.actualQty!==null) continue;
+    let s=0;
+    if(id&&norm(x.itemId)===id) s+=100;
+    if(vcm&&norm(x.vcm)===vcm) s+=10;
+    if(rnu&&norm(x.rnu)===rnu) s+=20;
+    if(sar&&norm(x.sarza)===sar) s+=20;
+    if(evc&&norm(x.evCislo)===evc) s+=30;
+    if(s>bestScore){bestScore=s;best=x;}
   }
+  if(best&&bestScore>=10){goItem(best);return;}
 
-  // Minimálne skóre 10 (aspoň VČM musí sedieť)
-  if(best && bestScore >= 10){
-    goItem(best);
-    return;
-  }
-
-  // Nenašlo sa — ukáž čo sme dostali
-  const rawLabel = p.vcm || p.id || '?';
-  const sample = INV.items.slice(0,3)
-    .map(x=>'VČM:'+x.vcm+(x.rnu?' RNU:'+x.rnu:'')+(x.sarza?' Šarža:'+x.sarza:'')).join(' | ');
-  document.getElementById('mo-unknown-vcm').textContent = rawLabel;
-  const diagEl = document.getElementById('mo-unknown-diag');
-  if(diagEl) diagEl.textContent = 'Hľadané: VČM='+p.vcm+' RNU='+p.rnu+' Šarža='+p.sar+' | Príklady: '+sample;
-  openMo('mo-unknown'); stopCam();
+  const rawLabel=p.vcm||p.id||'?';
+  const sample=INV.items.slice(0,3).map(x=>'VČM:'+x.vcm+(x.rnu?' RNU:'+x.rnu:'')).join(' | ');
+  document.getElementById('unk-vcm').textContent=rawLabel;
+  document.getElementById('unk-diag').textContent='Hľadané: VČM='+p.vcm+' RNU='+p.rnu+' | Príklady: '+sample;
+  openMo('mo-unknown');stopCam();
 }
 
-// Zachovaj starú funkciu ako alias pre manuálny vstup
-function lookupVcm(raw){
-  lookupItem({vcm: raw, id:'', rnu:'', sar:'', evc:'', dmc:''});
-}
-
+function resumeScan(){lastRaw='';startCam();}
 function addExtra(){
-  const vcm=document.getElementById('mo-unknown-vcm').textContent;
+  const vcm=document.getElementById('unk-vcm').textContent;
   closeMo('mo-unknown');
-  const extra={vcm,name:'(Navyše – nie je v evidencii)',typ:'?',zmj:'ks',expectedQty:0,actualQty:null,scanned:false,skipped:false,isExtra:true};
-  INV.items.push(extra); saveDB();
-  goItem(extra);
+  const ex={vcm,itemId:'',name:'(Navyše – nie je v evidencii)',typ:'?',zmj:'ks',rnu:'',sarza:'',evCislo:'',cisloMat:'',expectedQty:0,actualQty:null,scanned:false,skipped:false,isExtra:true,note:''};
+  INV.items.push(ex);saveDB();goItem(ex);
 }
-
-function resumeScan(){ lastRaw=''; startCam(); }
 
 function onManualVcm(){
-  const v   = document.getElementById('manual-vcm').value.trim().toUpperCase();
-  const rnu = document.getElementById('manual-rnu').value.trim();
-  const sar = document.getElementById('manual-sar').value.trim();
+  const v=document.getElementById('manual-vcm').value.trim().toUpperCase();
+  const rnu=document.getElementById('manual-rnu').value.trim();
+  const sar=document.getElementById('manual-sar').value.trim();
   if(!v) return;
-  // Vytvor payload ako keby prišiel z QR kódu
-  lookupItem({ vcm:v, id:'', rnu:rnu, sar:sar, evc:'', dmc:'' });
-  document.getElementById('manual-vcm').value='';
-  document.getElementById('manual-rnu').value='';
-  document.getElementById('manual-sar').value='';
+  lookupItem({vcm:v,id:'',rnu,sar,evc:'',dmc:''});
+  ['manual-vcm','manual-rnu','manual-sar'].forEach(id=>document.getElementById(id).value='');
 }
-document.getElementById('manual-vcm').addEventListener('keydown',e=>{ if(e.key==='Enter') onManualVcm(); });
+document.getElementById('manual-vcm').addEventListener('keydown',e=>{if(e.key==='Enter')onManualVcm();});
 
-// ═══════════════════════════════════════════════════════
-// ITEM / NUMPAD
-// ═══════════════════════════════════════════════════════
+// ═══ ITEM / NUMPAD ════════════════════════════════════
 function renderItem(){
   const it=ITEM;
-  document.getElementById('item-vcm').textContent  = it.vcm ? it.vcm : (it.itemId||'–');
-  document.getElementById('item-name').textContent = it.name;
-  document.getElementById('item-typ').textContent  = it.typ + (it.zt?' · ZT '+it.zt:'') + (it.kat?' · Kat.'+it.kat:'');
-  document.getElementById('item-zmj').textContent  = it.zmj;
-  document.getElementById('item-sklad-tag').textContent = INV.skladId;
-  document.getElementById('exp-qty').textContent   = it.expectedQty;
-  document.getElementById('act-qty').textContent   = it.actualQty!==null ? it.actualQty : '–';
-
-  // Detaily RNU / Šarža
-  const detEl = document.getElementById('item-details');
-  const details = [it.rnu?'RNU: '+it.rnu:'', it.sarza?'Šarža: '+it.sarza:'', it.evCislo?'Ev.č.: '+it.evCislo:''].filter(Boolean).join('  ·  ');
-  if(detEl){ detEl.textContent=details; detEl.style.display=details?'block':'none'; }
-
-  // Progres label
-  const progEl = document.getElementById('item-progress-label');
-  if(progEl && INV){
-    const done  = INV.items.filter(x=>x.scanned||x.skipped).length;
-    const total = INV.items.length;
-    progEl.textContent = done+'/'+total+' skontrolovaných';
-  }
-
-  // Reset stavov
-  document.getElementById('item-card').className      = 'item-card';
-  document.getElementById('diff-row').style.display   = 'none';
-  document.getElementById('diff-val').textContent     = '–';
-  document.getElementById('diff-val').className       = 'dv';
-  document.getElementById('act-box').className        = 'count-box act';
-  document.getElementById('btn-reopen-wrap').style.display = 'none';
-
-  // Numpad reset
-  npVal = '';
-  document.getElementById('np-display').textContent = '–';
-  document.getElementById('btn-confirm').disabled   = true;
-
-  // Rýchly mód — label s očakávaným počtom
-  document.getElementById('qs-exp-label').textContent = it.expectedQty + ' ' + it.zmj + ' podľa evidencie';
-
-  // Ak položka už bola skontrolovaná (oprava), zobraz numpad rovno
-  if(it.scanned && it.actualQty !== null){
-    npVal = String(it.actualQty);
-    document.getElementById('np-display').textContent = npVal;
-    document.getElementById('btn-confirm').disabled = false;
-    openNumpad();
-    updateLiveDiff();
-  } else {
-    closeNumpad();
-  }
-
+  document.getElementById('item-vcm').textContent=it.vcm||(it.itemId||'–');
+  document.getElementById('item-name').textContent=it.name;
+  document.getElementById('item-typ').textContent=it.typ+(it.zt?' · ZT '+it.zt:'')+(it.kat?' · Kat.'+it.kat:'');
+  document.getElementById('item-zmj').textContent=it.zmj;
+  document.getElementById('item-sklad').textContent=INV.skladId;
+  const det=[it.rnu?'RNU: '+it.rnu:'',it.sarza?'Šarža: '+it.sarza:'',it.evCislo?'Ev.č.: '+it.evCislo:''].filter(Boolean).join('  ·  ');
+  const detEl=document.getElementById('item-det'); detEl.textContent=det; detEl.style.display=det?'block':'none';
+  document.getElementById('exp-qty').textContent=it.expectedQty;
+  document.getElementById('act-qty').textContent=it.actualQty!==null?it.actualQty:'–';
+  document.getElementById('item-card').className='item-card';
+  document.getElementById('diff-row').style.display='none';
+  document.getElementById('diff-val').textContent='–'; document.getElementById('diff-val').className='dv';
+  document.getElementById('act-box').className='count-box act';
+  document.getElementById('reopen-wrap').style.display='none';
+  npVal=''; document.getElementById('np-display').textContent='–'; document.getElementById('btn-confirm').disabled=true;
+  document.getElementById('sedi-label').textContent=it.expectedQty+' '+it.zmj+' podľa evidencie';
+  // Progres
+  if(INV){const done=INV.items.filter(x=>x.scanned||x.skipped).length;document.getElementById('item-prog').textContent=done+'/'+INV.items.length+' skontrolovaných';}
   // Poznámka
-  const noteEl = document.getElementById('item-note');
-  if(noteEl) noteEl.value = it.note||'';
-  const hintEl = document.getElementById('note-saved-hint');
-  if(hintEl) hintEl.textContent = it.note?'✓ Poznámka uložená':'';
+  document.getElementById('item-note').value=it.note||'';
+  document.getElementById('note-hint').textContent=it.note?'✓ Poznámka uložená':'';
+  // Ak opravujem
+  if(it.scanned&&it.actualQty!==null){npVal=String(it.actualQty);document.getElementById('np-display').textContent=npVal;document.getElementById('btn-confirm').disabled=false;openNumpad();updateDiff();}
+  else closeNumpad();
 }
 
-function openNumpad(){
-  document.getElementById('quick-mode').style.display = 'none';
-  const wrap = document.getElementById('numpad-wrap');
-  wrap.classList.add('open');
-  // Scrolluj na numpad
-  setTimeout(()=>wrap.scrollIntoView({behavior:'smooth',block:'start'}), 50);
-}
+function openNumpad(){document.getElementById('quick-mode').style.display='none';document.getElementById('numpad-wrap').classList.add('open');}
+function closeNumpad(){document.getElementById('quick-mode').style.display='block';document.getElementById('numpad-wrap').classList.remove('open');npVal='';document.getElementById('np-display').textContent='–';document.getElementById('btn-confirm').disabled=true;document.getElementById('act-qty').textContent=ITEM&&ITEM.actualQty!==null?ITEM.actualQty:'–';document.getElementById('act-box').className='count-box act';document.getElementById('diff-row').style.display='none';document.getElementById('item-card').className='item-card';}
 
-function closeNumpad(){
-  document.getElementById('quick-mode').style.display = 'block';
-  const wrap = document.getElementById('numpad-wrap');
-  wrap.classList.remove('open');
-  npVal = '';
-  document.getElementById('np-display').textContent = '–';
-  document.getElementById('btn-confirm').disabled = true;
-  document.getElementById('act-qty').textContent = ITEM.actualQty!==null ? ITEM.actualQty : '–';
-  document.getElementById('act-box').className = 'count-box act';
-  document.getElementById('diff-row').style.display = 'none';
-  document.getElementById('item-card').className = 'item-card';
-}
+function quickSedi(){if(!ITEM)return;npVal=String(ITEM.expectedQty);doConfirm();}
+function skipItem(){if(!ITEM)return;ITEM.skipped=true;ITEM.scanned=false;ITEM.actualQty=null;sndWarn();saveDB();updateProg();updateCounts();document.getElementById('reopen-wrap').style.display='block';toast('Preskočené','warn');setTimeout(()=>{document.getElementById('reopen-wrap').style.display='none';nextItem();},400);}
 
-// Rýchle potvrdenie — sedí (1 klepnutie)
-function quickSedi(){
-  if(!ITEM) return;
-  npVal = String(ITEM.expectedQty);
-  doConfirmItem();
-}
+function np(d){if(npVal.length>=6)return;npVal+=d;document.getElementById('np-display').textContent=npVal;document.getElementById('btn-confirm').disabled=false;updateDiff();}
+function npDel(){if(!npVal)return;npVal=npVal.slice(0,-1);document.getElementById('np-display').textContent=npVal||'–';document.getElementById('btn-confirm').disabled=!npVal;if(!npVal){document.getElementById('act-qty').textContent=ITEM.actualQty!==null?ITEM.actualQty:'–';document.getElementById('act-box').className='count-box act';document.getElementById('diff-row').style.display='none';document.getElementById('item-card').className='item-card';}else updateDiff();}
 
-function np(d){
-  if(npVal.length>=6) return;
-  npVal+=d;
-  document.getElementById('np-display').textContent=npVal;
-  document.getElementById('btn-confirm').disabled=false;
-  updateLiveDiff();
-}
-
-function npDel(){
-  if(!npVal) return;
-  npVal=npVal.slice(0,-1);
-  document.getElementById('np-display').textContent=npVal||'–';
-  document.getElementById('btn-confirm').disabled=!npVal;
-  if(!npVal){ document.getElementById('act-qty').textContent=ITEM.actualQty!==null?ITEM.actualQty:'–'; document.getElementById('act-box').className='count-box act'; document.getElementById('item-card').className='item-card'; document.getElementById('diff-val').textContent='–'; document.getElementById('diff-val').className='dv'; }
-  else updateLiveDiff();
-}
-
-function updateLiveDiff(){
-  const actual=parseInt(npVal);
-  const exp=ITEM.expectedQty;
-  const diff=actual-exp;
+function updateDiff(){
+  const actual=parseInt(npVal),exp=ITEM.expectedQty,diff=actual-exp;
   document.getElementById('act-qty').textContent=actual;
   document.getElementById('diff-row').style.display='flex';
-  const actBox=document.getElementById('act-box');
-  const card=document.getElementById('item-card');
-  const dv=document.getElementById('diff-val');
-  if(diff===0){ actBox.className='count-box act match'; card.className='item-card match'; dv.textContent='✓ Sedí'; dv.className='dv ok'; }
-  else if(diff>0){ actBox.className='count-box act over'; card.className='item-card over'; dv.textContent='+'+diff+' (prebytok)'; dv.className='dv plus'; }
-  else{ actBox.className='count-box act under'; card.className='item-card under'; dv.textContent=diff+' (chýba)'; dv.className='dv minus'; }
+  const ab=document.getElementById('act-box'),card=document.getElementById('item-card'),dv=document.getElementById('diff-val');
+  if(diff===0){ab.className='count-box act match';card.className='item-card match';dv.textContent='✓ Sedí';dv.className='dv ok';}
+  else if(diff>0){ab.className='count-box act over';card.className='item-card over';dv.textContent='+'+diff+' (prebytok)';dv.className='dv plus';}
+  else{ab.className='count-box act under';card.className='item-card under';dv.textContent=diff+' (chýba)';dv.className='dv minus';}
 }
 
-// Dlhé klepnutie — potvrď s očakávaným počtom (sedí)
-let _longPressTimer = null;
-function startLongPress(){
-  _longPressTimer = setTimeout(()=>{
-    if(!ITEM || ITEM.scanned) return;
-    npVal = String(ITEM.expectedQty);
-    document.getElementById('np-display').textContent = npVal;
-    document.getElementById('btn-confirm').disabled = false;
-    updateLiveDiff();
-    // Krátka vibrácia ak je dostupná
-    if(navigator.vibrate) navigator.vibrate(60);
-    toast('Počet nastavený na '+npVal+' (evidencia)','info');
-  }, 600);
-}
-function cancelLongPress(){ if(_longPressTimer){ clearTimeout(_longPressTimer); _longPressTimer=null; } }
-
-function confirmItem(skip){
-  if(skip){
-    ITEM.skipped=true; ITEM.scanned=false; ITEM.actualQty=null;
-    toast('Preskočené','warn');
-    soundWarning();
-    saveDB(); updateProg(); updateCounts();
-    document.getElementById('btn-reopen-wrap').style.display='block';
-    document.getElementById('btn-confirm').disabled=true;
-    setTimeout(()=>{
-      document.getElementById('btn-reopen-wrap').style.display='none';
-      const next=INV.items.find(x=>!x.scanned&&!x.skipped&&!x.isExtra);
-      if(next) goScan(); else{ toast('🏁 Všetky položky skontrolované!','ok'); goResults(); }
-    }, 400);
-    return;
-  }
-  if(!npVal) return;
-  // Varovanie pri 0 kusoch
-  const qty = parseInt(npVal);
-  if(qty === 0 && ITEM.expectedQty > 0){
-    document.getElementById('mo-zero-name').textContent = ITEM.name;
-    openMo('mo-zero');
-    return;
-  }
-  doConfirmItem();
+function confirmCount(){
+  if(!npVal)return;
+  const qty=parseInt(npVal);
+  if(qty===0&&ITEM.expectedQty>0){document.getElementById('zero-name').textContent=ITEM.name;openMo('mo-zero');return;}
+  doConfirm();
 }
 
-function doConfirmItem(){
-  if(!npVal) return;
-  ITEM.actualQty=parseInt(npVal); ITEM.scanned=true; ITEM.skipped=false;
+function doConfirm(){
+  if(!ITEM)return;
+  ITEM.actualQty=parseInt(npVal);ITEM.scanned=true;ITEM.skipped=false;
   const diff=ITEM.actualQty-ITEM.expectedQty;
-  if(diff===0){ toast('✓ Sedí!','ok'); soundOK(); flashScreen('ok'); }
-  else if(diff>0){ toast('⚠ Prebytok: +'+diff,'warn'); soundWarning(); flashScreen('err'); }
-  else{ toast('✗ Chýba: '+diff,'err'); soundError(); flashScreen('err'); }
-  saveDB(); updateProg(); updateCounts();
-  document.getElementById('btn-reopen-wrap').style.display='block';
+  if(diff===0){toast('✓ Sedí!','ok');sndOK();flash('ok');}
+  else if(diff>0){toast('⚠ Prebytok: +'+diff,'warn');sndWarn();flash('err');}
+  else{toast('✗ Chýba: '+diff,'err');sndErr();flash('err');}
+  saveDB();updateProg();updateCounts();
+  document.getElementById('reopen-wrap').style.display='block';
   document.getElementById('btn-confirm').disabled=true;
-  setTimeout(()=>{
-    document.getElementById('btn-reopen-wrap').style.display='none';
-    const next=INV.items.find(x=>!x.scanned&&!x.skipped&&!x.isExtra);
-    if(next) goScan(); else{ toast('🏁 Všetky položky skontrolované!','ok'); goResults(); }
-  }, 1500);
+  setTimeout(()=>{document.getElementById('reopen-wrap').style.display='none';nextItem();},1500);
 }
 
-// Uloží poznámku k položke
-function saveItemNote(val){
-  if(!ITEM) return;
-  ITEM.note = val.trim();
-  saveDB();
-  const hintEl = document.getElementById('note-saved-hint');
-  if(hintEl) hintEl.textContent = val.trim() ? '✓ Uložené' : '';
+function nextItem(){
+  const next=INV.items.find(x=>!x.scanned&&!x.skipped&&!x.isExtra);
+  if(next)goScan();else{toast('🏁 Všetky položky skontrolované!','ok');goResults();}
 }
 
-function clearItemNote(){
-  if(!ITEM) return;
-  ITEM.note = '';
-  saveDB();
-  const noteEl = document.getElementById('item-note');
-  if(noteEl) noteEl.value = '';
-  const hintEl = document.getElementById('note-saved-hint');
-  if(hintEl) hintEl.textContent = '';
+function reopenItem(){
+  if(!ITEM)return;
+  ITEM.actualQty=null;ITEM.scanned=false;ITEM.skipped=false;npVal='';saveDB();
+  document.getElementById('reopen-wrap').style.display='none';
+  renderItem();openNumpad();toast('Zadaj nový počet','info');
 }
 
-// Zoznam čakajúcich položiek na scan screene
-function togglePendingList(){
-  if(!INV) return;
-  const wrap = document.getElementById('pending-list-wrap');
-  const list = document.getElementById('pending-list');
-  if(wrap.style.display==='block'){ wrap.style.display='none'; return; }
+function saveNote(v){if(!ITEM)return;ITEM.note=v.trim();saveDB();document.getElementById('note-hint').textContent=v.trim()?'✓ Uložená':'';}
+function clearNote(){if(!ITEM)return;ITEM.note='';saveDB();document.getElementById('item-note').value='';document.getElementById('note-hint').textContent='';}
 
-  // Zozbieraj neskontrolované, zoraď podľa pozície
-  const pending = INV.items
-    .filter(x=>!x.scanned&&!x.skipped&&!x.isExtra)
-    .sort((a,b)=>(a.pos||'').localeCompare(b.pos||''));
-
-  if(!pending.length){
-    list.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:var(--green)">✓ Všetky položky skontrolované!</div>';
-  } else {
-    list.innerHTML = pending.map(it=>`
-      <div onclick="goItem(INV.items.find(x=>x.vcm===\'${it.vcm.replace(/'/g,"\\'")}\' && !x.scanned))"
-        style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div style="font-family:var(--mono);font-size:11px;color:var(--accent)">${it.vcm||'–'}</div>
-          <div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name}</div>
-          ${it.pos?`<div style="font-size:10px;color:var(--text3)">Pozícia: ${it.pos}</div>`:''}
-        </div>
-        <div style="font-size:11px;color:var(--text3);flex-shrink:0">${it.expectedQty} ${it.zmj}</div>
-      </div>`).join('');
-  }
+function togglePending(){
+  const wrap=document.getElementById('pending-wrap');
+  if(wrap.style.display==='block'){wrap.style.display='none';return;}
+  const list=document.getElementById('pending-list');
+  const pending=INV?INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).sort((a,b)=>(a.pos||'').localeCompare(b.pos||'')):[];
+  if(!pending.length){list.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:var(--green)">✓ Všetko skontrolované!</div>';}
+  else{list.innerHTML=pending.map((it,i)=>`<div class="pending-item" onclick="goItem(INV.items.find(x=>x.vcm===\\'${it.vcm.replace(/'/g,"\\\\'")}\\'))"><div style="flex:1;min-width:0"><div style="font-family:var(--mono);font-size:11px;color:var(--accent)">${it.vcm||'–'}</div><div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name}</div>${it.pos?'<div style="font-size:10px;color:var(--text3)">Pozícia: '+it.pos+'</div>':''}</div><div style="font-size:11px;color:var(--text3);flex-shrink:0">${it.expectedQty} ${it.zmj}</div></div>`).join('');}
   wrap.style.display='block';
 }
 
-// Oprav zadaný počet — vynuluj potvrdenie a nechaj znova zadať
-function reopenItem(){
-  ITEM.actualQty = null;
-  ITEM.scanned   = false;
-  ITEM.skipped   = false;
-  npVal = '';
-  saveDB();
-  document.getElementById('btn-reopen-wrap').style.display = 'none';
-  document.getElementById('np-display').textContent = '–';
-  document.getElementById('btn-confirm').disabled = true;
-  document.getElementById('act-qty').textContent = '–';
-  document.getElementById('act-box').className = 'count-box act';
-  document.getElementById('item-card').className = 'item-card';
-  document.getElementById('diff-row').style.display = 'none';
-  document.getElementById('diff-val').textContent = '–';
-  document.getElementById('diff-val').className = 'dv';
-  openNumpad();
-  toast('Zadaj nový počet','info');
-}
-
-// ═══════════════════════════════════════════════════════
-// RESULTS
-// ═══════════════════════════════════════════════════════
+// ═══ RESULTS ══════════════════════════════════════════
 function renderSummary(){
-  if(!INV) return;
+  if(!INV)return;
   const sc=INV.items.filter(x=>x.scanned);
-  document.getElementById('r-ok').textContent    = sc.filter(x=>x.actualQty===x.expectedQty).length;
-  document.getElementById('r-over').textContent  = sc.filter(x=>x.actualQty>x.expectedQty).length;
-  document.getElementById('r-under').textContent = sc.filter(x=>x.actualQty<x.expectedQty).length;
+  document.getElementById('r-ok').textContent=sc.filter(x=>x.actualQty===x.expectedQty).length;
+  document.getElementById('r-over').textContent=sc.filter(x=>x.actualQty>x.expectedQty).length;
+  document.getElementById('r-under').textContent=sc.filter(x=>x.actualQty<x.expectedQty).length;
 }
 
 function setFilter(f){
-  filter=f;
-  ['all','err','warn','ok','skip','new'].forEach(x=>{ const b=document.getElementById('fb-'+x); if(b) b.className='fb'+(x===f?' active':''); });
+  curFilter=f;
+  ['all','err','warn','ok','skip','new'].forEach(x=>{const b=document.getElementById('fb-'+x);if(b)b.className='fb'+(x===f?' active':'');});
   renderResults();
 }
 
 function renderResults(){
-  if(!INV) return;
+  if(!INV)return;
   let items=INV.items.filter(x=>x.scanned||x.skipped||x.isExtra);
-  if(filter==='ok')   items=items.filter(x=>x.scanned&&x.actualQty===x.expectedQty);
-  if(filter==='err')  items=items.filter(x=>x.scanned&&x.actualQty<x.expectedQty);
-  if(filter==='warn') items=items.filter(x=>x.scanned&&x.actualQty>x.expectedQty);
-  if(filter==='skip') items=items.filter(x=>x.skipped);
-  if(filter==='new')  items=items.filter(x=>x.isExtra);
-
+  if(curFilter==='ok')items=items.filter(x=>x.scanned&&x.actualQty===x.expectedQty);
+  else if(curFilter==='err')items=items.filter(x=>x.scanned&&x.actualQty<x.expectedQty);
+  else if(curFilter==='warn')items=items.filter(x=>x.scanned&&x.actualQty>x.expectedQty);
+  else if(curFilter==='skip')items=items.filter(x=>x.skipped);
+  else if(curFilter==='new')items=items.filter(x=>x.isExtra);
   const el=document.getElementById('results-list');
-  if(!items.length){ el.innerHTML='<p style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Žiadne položky</p>'; return; }
-
+  if(!items.length){el.innerHTML='<p style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Žiadne položky</p>';return;}
   el.innerHTML=items.map(it=>{
     let cls,icon,diff;
-    if(it.skipped){        cls='skip'; icon='⏭'; diff='–'; }
-    else if(it.isExtra&&it.expectedQty===0){ cls='warn'; icon='+'; diff='navyše'; }
-    else{
-      const d=it.actualQty-it.expectedQty;
-      if(d===0){ cls='ok'; icon='✓'; diff='OK'; }
-      else if(d>0){ cls='warn'; icon='+'+d; diff='+'+d; }
-      else{ cls='err'; icon=d; diff=''+d; }
-    }
-    const qtyStr=it.skipped?'–':it.actualQty+'/'+it.expectedQty+' '+it.zmj;
-    const origIdx=INV.items.indexOf(it);
-    return `<div class="ri" onclick="goItem(INV.items[${origIdx}])">
+    if(it.skipped){cls='skip';icon='⏭';diff='–';}
+    else if(it.isExtra&&it.expectedQty===0){cls='warn';icon='+';diff='navyše';}
+    else{const d=it.actualQty-it.expectedQty;if(d===0){cls='ok';icon='✓';diff='OK';}else if(d>0){cls='warn';icon='+'+d;diff='+'+d;}else{cls='err';icon=''+d;diff=''+d;}}
+    const qty=it.skipped?'–':it.actualQty+'/'+it.expectedQty+' '+it.zmj;
+    const idx=INV.items.indexOf(it);
+    return `<div class="ri" onclick="goItem(INV.items[${idx}])">
       <div class="ri-icon ${cls}">${icon}</div>
       <div class="ri-body">
         <div class="ri-vcm">${it.vcm}${it.rnu?' · '+it.rnu:''}${it.sarza?' · '+it.sarza:''}</div>
         <div class="ri-name">${it.name}</div>
-        ${it.note?`<div style="font-size:10px;color:var(--amber);margin-top:1px">📝 ${it.note}</div>`:''}
+        ${it.note?'<div style="font-size:10px;color:var(--amber);margin-top:1px">📝 '+it.note+'</div>':''}
       </div>
-      <div>
-        <div class="ri-diff ${cls}">${diff}</div>
-        <div style="font-size:10px;color:var(--text3);text-align:right;margin-top:2px">${qtyStr}</div>
-      </div>
+      <div><div class="ri-diff ${cls}">${diff}</div><div style="font-size:10px;color:var(--text3);text-align:right;margin-top:2px">${qty}</div></div>
     </div>`;
   }).join('');
 }
 
-// ═══════════════════════════════════════════════════════
-// EXPORT
-// ═══════════════════════════════════════════════════════
-function exportReport(type){
-  if(!INV) return;
-  if(type==='json') exportJSON();
-  else exportPDF(INV);
-}
+// ═══ EXPORT ═══════════════════════════════════════════
+function getStav(it){if(it.skipped)return'Preskočené';if(it.isExtra)return'Navyše';if(!it.scanned)return'Neskontrolované';const d=it.actualQty-it.expectedQty;return d===0?'Sedí':d>0?'Prebytok':'Chýba';}
 
 function exportJSON(){
-  if(!INV) return;
-  const data={
-    exportType:'NSE_INVENTURA_REPORT', version:'2.0',
-    exported:new Date().toISOString(),
-    sklad:INV.skladId, skladName:INV.skladName, datum:INV.date,
-    items:INV.items.map(it=>({
-      vcm:it.vcm, nazov:it.name, typ:it.typ, zmj:it.zmj,
-      rnu:it.rnu||'', sarza:it.sarza||'', evCislo:it.evCislo||'', cisloMat:it.cisloMat||'',
-      evidencia:it.expectedQty, skutocnost:it.actualQty,
-      rozdiel:it.scanned?it.actualQty-it.expectedQty:null,
-      stav:getStav(it)
-    }))
-  };
-  dlFile('inventura_'+INV.skladId+'_'+isoDate()+'.json', JSON.stringify(data,null,2), 'application/json');
+  if(!INV)return;
+  dlFile('inventura_'+INV.skladId+'_'+isoDate()+'.json',JSON.stringify({exportType:'NSE_INVENTURA_REPORT',version:'2.0',exported:new Date().toISOString(),sklad:INV.skladId,skladName:INV.skladName,datum:INV.date,items:INV.items.map(it=>({vcm:it.vcm,nazov:it.name,typ:it.typ,zmj:it.zmj,rnu:it.rnu||'',sarza:it.sarza||'',evCislo:it.evCislo||'',cisloMat:it.cisloMat||'',evidencia:it.expectedQty,skutocnost:it.actualQty,rozdiel:it.scanned?it.actualQty-it.expectedQty:null,stav:getStav(it),poznamka:it.note||''}))},null,2),'application/json');
   toast('JSON exportovaný','ok');
 }
 
-function getStav(it){
-  if(it.skipped) return 'Preskočené';
-  if(it.isExtra) return 'Navyše';
-  if(!it.scanned) return 'Neskontrolované';
-  const d = it.actualQty - it.expectedQty;
-  return d===0 ? 'Sedí' : d>0 ? 'Prebytok' : 'Chýba';
+function exportReport(invList){
+  const list=invList||(INV?[INV]:[]);
+  if(!list.length)return;
+  const date=new Date().toLocaleDateString('sk-SK');
+  const title=list.length===1?'Inventúrny report – '+list[0].skladName:'Inventúrny report – Všetky sklady';
+  const html=buildReport(list,title,date);
+  dlFile('report_'+(list.length===1?list[0].skladId:'vsetky')+'_'+isoDate()+'.html',html,'text/html');
+  toast('Report stiahnutý','ok');
 }
 
-// Vygeneruje riadky tabuľky pre dané položky
-function buildTableRows(items){
-  return items.map(it=>{
-    const diff = it.scanned ? it.actualQty - it.expectedQty : null;
-    const stav = getStav(it);
-    const stavColor = it.skipped||!it.scanned ? '#6b7280'
-      : diff===0 ? '#16a34a' : diff>0 ? '#d97706' : '#dc2626';
-    const stavBg = it.skipped||!it.scanned ? '#f3f4f6'
-      : diff===0 ? '#dcfce7' : diff>0 ? '#fef3c7' : '#fee2e2';
-    const stavText = it.skipped ? '⏭ Preskočené'
-      : !it.scanned ? '○ Neskontrolované'
-      : it.isExtra ? '+ Navyše'
-      : diff===0 ? '✓ Sedí'
-      : diff>0 ? '▲ +'+diff : '▼ '+diff;
-
-    return `<tr>
-      <td style="font-family:monospace;font-size:11px;color:#1d4ed8;white-space:nowrap">${it.vcm||'–'}</td>
-      <td style="font-size:12px">${it.name||'–'}</td>
-      <td style="font-size:11px;text-align:center;white-space:nowrap">${it.rnu||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap">${it.sarza||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap">${it.evCislo||it.cisloMat||'–'}</td>
-      <td style="font-size:11px;text-align:center">${it.typ||'–'}</td>
-      <td style="font-size:11px;text-align:center;white-space:nowrap">${it.expectedQty} ${it.zmj}</td>
-      <td style="font-size:11px;text-align:center;white-space:nowrap">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
-      <td style="text-align:center;white-space:nowrap">
-        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${stavColor};background:${stavBg}">${stavText}</span>
-      </td>
-    </tr>`;
-  }).join('');
+function buildRow1(it){
+  const diff=it.scanned?it.actualQty-it.expectedQty:null;
+  const bg=['#fff','#f8fafc'][0];
+  let sc='#6b7280',sb='#f3f4f6',st='–';
+  if(it.skipped){st='⏭ Preskočené';}
+  else if(it.isExtra){sc='#92400e';sb='#fef3c7';st='+ Navyše';}
+  else if(!it.scanned){st='○ Neskont.';}
+  else if(diff>0){sc='#92400e';sb='#fef3c7';st='▲ +'+diff;}
+  else if(diff<0){sc='#991b1b';sb='#fee2e2';st='▼ '+diff;}
+  return`<tr><td style="font-family:monospace;font-size:11px;color:#1d4ed8;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">${it.vcm||'–'}</td><td style="font-size:12px;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.name||'–'}</td><td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.rnu||'–'}</td><td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.sarza||'–'}</td><td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.expectedQty} ${it.zmj}</td><td style="font-family:monospace;font-size:11px;font-weight:700;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td><td style="text-align:center;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap"><span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:700;color:${sc};background:${sb}">${st}</span></td><td style="font-size:11px;color:#92400e;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.note||''}</td></tr>`;
 }
 
-// Vygeneruje súhrnný blok pre jeden sklad
-function buildSkladSection(inv){
-  const sc = inv.items.filter(x=>x.scanned);
-  const total = inv.items.length;
-  const ok    = sc.filter(x=>x.actualQty===x.expectedQty).length;
-  const over  = sc.filter(x=>x.actualQty>x.expectedQty).length;
-  const under = sc.filter(x=>x.actualQty<x.expectedQty).length;
-  const skip  = inv.items.filter(x=>x.skipped).length;
-  const extra = inv.items.filter(x=>x.isExtra).length;
-  const rows  = buildTableRows(inv.items);
-
-  return `
-  <div style="margin-bottom:32px;page-break-inside:avoid">
-    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
-      <h2 style="font-size:16px;font-weight:700;color:#1e3a5f;margin:0">${inv.skladName||inv.skladId}</h2>
-      <span style="font-family:monospace;font-size:12px;color:#6b7280">${inv.skladId}</span>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#dbeafe;color:#1d4ed8">Celkom: ${total}</span>
-      <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#dcfce7;color:#16a34a">✓ Sedí: ${ok}</span>
-      ${over>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fef3c7;color:#d97706">▲ Prebytok: ${over}</span>`:''}
-      ${under>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fee2e2;color:#dc2626">▼ Chýba: ${under}</span>`:''}
-      ${skip>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#f3f4f6;color:#6b7280">⏭ Preskočené: ${skip}</span>`:''}
-      ${extra>0?`<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fef3c7;color:#d97706">+ Navyše: ${extra}</span>`:''}
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
-      <thead>
-        <tr style="background:#1e3a5f;color:#fff">
-          <th style="padding:7px 8px;text-align:left;font-size:10px;letter-spacing:0.5px">VČM</th>
-          <th style="padding:7px 8px;text-align:left;font-size:10px;letter-spacing:0.5px">NÁZOV</th>
-          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">RNU</th>
-          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">ŠARŽA</th>
-          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">EV.Č./DM</th>
-          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">TYP</th>
-          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">EVIDENCIA</th>
-          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">SKUTOČNOSŤ</th>
-          <th style="padding:7px 8px;text-align:center;font-size:10px;letter-spacing:0.5px">VÝSLEDOK</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>`;
+function buildRow2(it,idx){
+  const diff=it.scanned?it.actualQty-it.expectedQty:null;
+  const bg=idx%2===0?'#fff':'#f8fafc';
+  let sc='#374151',sb='#f3f4f6',st=getStav(it);
+  if(it.skipped){sc='#6b7280';st='⏭ Preskočené';}
+  else if(it.isExtra){sc='#92400e';sb='#fef3c7';st='+ Navyše';}
+  else if(!it.scanned){sc='#6b7280';st='○ Neskontrolované';}
+  else if(diff===0){sc='#166534';sb='#dcfce7';st='✓ Sedí';}
+  else if(diff>0){sc='#92400e';sb='#fef3c7';st='▲ +'+diff;}
+  else{sc='#991b1b';sb='#fee2e2';st='▼ '+diff;}
+  return`<tr style="background:${bg}"><td style="font-family:monospace;font-size:11px;color:#1d4ed8;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.vcm||'–'}</td><td style="font-family:monospace;font-size:11px;color:#374151;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.rnu||'–'}</td><td style="font-size:12px;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:200px">${it.name||'–'}</td><td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.sarza||'–'}</td><td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.evCislo||it.cisloMat||'–'}</td><td style="font-size:11px;text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280">${it.typ||'–'}</td><td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.expectedQty} ${it.zmj}</td><td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;font-weight:700;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td><td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${sc};background:${sb}">${st}</span></td><td style="font-size:11px;color:#92400e;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:120px">${it.note||''}</td></tr>`;
 }
 
-// Exportuje report pre jeden sklad
-function exportPDF(inv){
-  if(!inv) return;
-  const html = buildPDFDocument([inv], 'Inventúrny report – '+inv.skladName, inv.date);
-  dlFile('report_'+inv.skladId+'_'+isoDate()+'.html', html, 'text/html');
-  toast('Report stiahnutý — otvor súbor a vytlač ako PDF','ok');
-}
+function buildReport(invList,title,date){
+  const all=invList.flatMap(i=>i.items);
+  const tot=all.length,ok=all.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length,over=all.filter(x=>x.scanned&&x.actualQty>x.expectedQty).length,under=all.filter(x=>x.scanned&&x.actualQty<x.expectedQty).length,skip=all.filter(x=>x.skipped).length,notDone=all.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+  const diffAll=all.filter(x=>(x.scanned&&x.actualQty!==x.expectedQty)||x.isExtra||x.skipped||(!x.scanned&&!x.skipped&&!x.isExtra));
+  const rnk=x=>x.isExtra?1:(!x.scanned&&!x.skipped)?5:x.skipped?4:x.actualQty<x.expectedQty?0:x.actualQty>x.expectedQty?1:3;
 
-// Exportuje jeden PDF pre všetky sklady
-function exportAllPDF(inventories){
-  const date = new Date().toLocaleDateString('sk-SK');
-  const html = buildPDFDocument(inventories, 'Inventúrny report – Všetky sklady', date);
-  dlFile('inventura_report_vsetky_sklady_'+isoDate()+'.html', html, 'text/html');
-  toast('Report stiahnutý — otvor súbor a vytlač ako PDF','ok');
-}
-
-// Pomocná: riadky diff tabuľky
-function _pdfDiffRows(items){
-  return items.map((it,idx)=>{
-    const diff = it.scanned ? it.actualQty - it.expectedQty : null;
-    const bg = idx%2===0?'#ffffff':'#f8fafc';
-    let sc='#6b7280',sb='#f3f4f6',st='–';
-    if(it.skipped){sc='#6b7280';sb='#f3f4f6';st='⏭ Preskočené';}
-    else if(it.isExtra){sc='#92400e';sb='#fef3c7';st='+ Navyše';}
-    else if(!it.scanned){sc='#6b7280';sb='#f3f4f6';st='○ Neskont.';}
-    else if(diff>0){sc='#92400e';sb='#fef3c7';st='▲ +'+diff;}
-    else if(diff<0){sc='#991b1b';sb='#fee2e2';st='▼ '+diff;}
-    return `<tr style="background:${bg}">
-      <td style="font-family:monospace;font-size:11px;color:#1d4ed8;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">${it.vcm||'–'}</td>
-      <td style="font-size:12px;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.name||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.rnu||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.sarza||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.expectedQty} ${it.zmj}</td>
-      <td style="font-family:monospace;font-size:11px;font-weight:700;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
-      <td style="text-align:center;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap"><span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:700;color:${sc};background:${sb}">${st}</span></td>
-      <td style="font-size:11px;color:#92400e;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.note||''}</td>
-    </tr>`;
-  }).join('');
-}
-
-// Pomocná: kompletné riadky tabuľky (strana 2)
-function _pdfFullRows(items){
-  return items.map((it,idx)=>{
-    const diff = it.scanned ? it.actualQty - it.expectedQty : null;
-    const bg = idx%2===0?'#ffffff':'#f8fafc';
-    let sc='#374151',sb='#f3f4f6',st=getStav(it);
-    if(it.skipped){sc='#6b7280';sb='#f3f4f6';st='⏭ Preskočené';}
-    else if(it.isExtra){sc='#92400e';sb='#fef3c7';st='+ Navyše';}
-    else if(!it.scanned){sc='#6b7280';sb='#f3f4f6';st='○ Neskontrolované';}
-    else if(diff===0){sc='#166534';sb='#dcfce7';st='✓ Sedí';}
-    else if(diff>0){sc='#92400e';sb='#fef3c7';st='▲ +'+diff;}
-    else{sc='#991b1b';sb='#fee2e2';st='▼ '+diff;}
-    return `<tr style="background:${bg}">
-      <td style="font-family:monospace;font-size:11px;color:#1d4ed8;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.vcm||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;color:#374151;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.rnu||'–'}</td>
-      <td style="font-size:12px;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:200px">${it.name||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.sarza||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.evCislo||it.cisloMat||'–'}</td>
-      <td style="font-size:11px;text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280">${it.typ||'–'}</td>
-      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.expectedQty} ${it.zmj}</td>
-      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;font-weight:700;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
-      <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${sc};background:${sb}">${st}</span></td>
-      <td style="font-size:11px;color:#92400e;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:120px">${it.note||''}</td>
-    </tr>`;
-  }).join('');
-}
-
-// Vygeneruje kompletný HTML report — Strana 1: rozdiely, Strana 2: kompletný zoznam
-function buildPDFDocument(invList, title, date){
-  const allItems = invList.flatMap(i=>i.items);
-  const totalAll = allItems.length;
-  const okAll    = allItems.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
-  const overAll  = allItems.filter(x=>x.scanned&&x.actualQty>x.expectedQty).length;
-  const underAll = allItems.filter(x=>x.scanned&&x.actualQty<x.expectedQty).length;
-  const skipAll  = allItems.filter(x=>x.skipped).length;
-  const notDone  = allItems.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-
-  // Rozdiely celkom
-  const diffItems = allItems.filter(x=>
-    (x.scanned && x.actualQty !== x.expectedQty) || x.isExtra || x.skipped || (!x.scanned&&!x.skipped&&!x.isExtra)
-  );
-
-  // STRANA 1 — diff sekcie per sklad
-  const diffSections = invList.map(inv=>{
-    const sc     = inv.items.filter(x=>x.scanned);
-    const iDiff  = sc.filter(x=>x.actualQty!==x.expectedQty).length;
-    const iExtra = inv.items.filter(x=>x.isExtra).length;
-    const iSkip  = inv.items.filter(x=>x.skipped).length;
-    const iNot   = inv.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-
-    if(!iDiff&&!iExtra&&!iSkip&&!iNot) return `
-      <div style="margin-bottom:16px;padding:10px 14px;background:#dcfce7;border-radius:8px">
-        <span style="font-size:13px;font-weight:700;color:#1e3a5f">${inv.skladName}</span>
-        <span style="font-family:monospace;font-size:11px;color:#6b7280;margin-left:8px">${inv.skladId}</span>
-        <span style="color:#166534;font-weight:600;font-size:13px;margin-left:10px">✓ Všetky položky sedia</span>
-      </div>`;
-
-    const diffs = inv.items.filter(x=>
-      (x.scanned&&x.actualQty!==x.expectedQty)||x.isExtra||x.skipped||(!x.scanned&&!x.skipped&&!x.isExtra)
-    ).sort((a,b)=>{
-      const r=x=>x.isExtra?1:(!x.scanned&&!x.skipped)?5:x.skipped?4:x.actualQty<x.expectedQty?0:x.actualQty>x.expectedQty?1:3;
-      return r(a)-r(b);
-    });
-
-    return `
-    <div style="margin-bottom:24px">
-      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="font-size:14px;font-weight:700;color:#1e3a5f">${inv.skladName}</span>
-        <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span>
-        ${iDiff>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">${iDiff} rozdiel</span>`:''}
-        ${iExtra>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e">${iExtra} navyše</span>`:''}
-        ${iSkip>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f3f4f6;color:#6b7280">${iSkip} preskočené</span>`:''}
-        ${iNot>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f3f4f6;color:#6b7280">${iNot} neskont.</span>`:''}
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;min-width:560px">
-          <thead><tr style="background:#7f1d1d">
-            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">VČM</th>
-            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">NÁZOV</th>
-            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">RNU</th>
-            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">ŠARŽA</th>
-            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">EVIDENCIA</th>
-            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">SKUTOČNOSŤ</th>
-            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">ROZDIEL</th>
-            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">POZNÁMKA</th>
-          </tr></thead>
-          <tbody>${_pdfDiffRows(diffs)}</tbody>
-        </table>
-      </div>
-    </div>`;
+  const diffSects=invList.map(inv=>{
+    const diffs=inv.items.filter(x=>(x.scanned&&x.actualQty!==x.expectedQty)||x.isExtra||x.skipped||(!x.scanned&&!x.skipped&&!x.isExtra)).sort((a,b)=>rnk(a)-rnk(b));
+    if(!diffs.length)return`<div style="margin-bottom:16px;padding:10px 14px;background:#dcfce7;border-radius:8px"><span style="font-size:13px;font-weight:700;color:#1e3a5f">${inv.skladName}</span><span style="font-family:monospace;font-size:11px;color:#6b7280;margin-left:8px">${inv.skladId}</span><span style="color:#166534;font-weight:600;margin-left:10px">✓ Všetko sedí</span></div>`;
+    return`<div style="margin-bottom:24px"><div style="font-size:14px;font-weight:700;color:#1e3a5f;margin-bottom:8px">${inv.skladName} <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:560px"><thead><tr style="background:#7f1d1d"><th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">VČM</th><th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">NÁZOV</th><th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">RNU</th><th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">ŠARŽA</th><th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">EVIDENCIA</th><th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">SKUTOČNOSŤ</th><th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">ROZDIEL</th><th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">POZNÁMKA</th></tr></thead><tbody>${diffs.map(buildRow1).join('')}</tbody></table></div></div>`;
   }).join('');
 
-  // STRANA 2 — kompletný zoznam per sklad
-  const fullSections = invList.map(inv=>{
-    const sorted = [...inv.items].sort((a,b)=>{
-      const r=x=>x.isExtra?1:(!x.scanned&&!x.skipped)?5:x.skipped?4:x.actualQty<x.expectedQty?0:x.actualQty>x.expectedQty?1:3;
-      return r(a)-r(b);
-    });
-    const sc=sorted.filter(x=>x.scanned);
-    const iOk=sc.filter(x=>x.actualQty===x.expectedQty).length;
-    const iOver=sc.filter(x=>x.actualQty>x.expectedQty).length;
-    const iUnder=sc.filter(x=>x.actualQty<x.expectedQty).length;
-    const iSkip=sorted.filter(x=>x.skipped).length;
-    const iExtra=sorted.filter(x=>x.isExtra).length;
-    const iNot=sorted.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-    return `
-    <div style="margin-bottom:28px">
-      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-        <span style="font-size:14px;font-weight:700;color:#1e3a5f">${inv.skladName}</span>
-        <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#dbeafe;color:#1d4ed8">Celkom: ${sorted.length}</span>
-        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#dcfce7;color:#166534">✓ ${iOk}</span>
-        ${iOver>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">▲ ${iOver}</span>`:''}
-        ${iUnder>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fee2e2;color:#991b1b">▼ ${iUnder}</span>`:''}
-        ${iSkip>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#6b7280">⏭ ${iSkip}</span>`:''}
-        ${iExtra>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">+ ${iExtra}</span>`:''}
-        ${iNot>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#9ca3af">○ ${iNot}</span>`:''}
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;min-width:700px">
-          <thead><tr style="background:#1e3a5f">
-            <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">VČM</th>
-            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">RNU</th>
-            <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">NÁZOV</th>
-            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">ŠARŽA</th>
-            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">EV.Č./DM</th>
-            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">TYP</th>
-            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">EVIDENCIA</th>
-            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">SKUTOČNOSŤ</th>
-            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">VÝSLEDOK</th>
-            <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">POZNÁMKA</th>
-          </tr></thead>
-          <tbody>${_pdfFullRows(sorted)}</tbody>
-        </table>
-      </div>
-    </div>`;
+  const fullSects=invList.map(inv=>{
+    const sorted=[...inv.items].sort((a,b)=>rnk(a)-rnk(b));
+    return`<div style="margin-bottom:28px"><div style="font-size:14px;font-weight:700;color:#1e3a5f;margin-bottom:8px">${inv.skladName} <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:700px"><thead><tr style="background:#1e3a5f"><th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">VČM</th><th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">RNU</th><th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">NÁZOV</th><th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">ŠARŽA</th><th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">EV.Č./DM</th><th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">TYP</th><th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">EVIDENCIA</th><th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">SKUTOČNOSŤ</th><th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">VÝSLEDOK</th><th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">POZNÁMKA</th></tr></thead><tbody>${sorted.map((it,i)=>buildRow2(it,i)).join('')}</tbody></table></div></div>`;
   }).join('<div style="border-top:2px solid #e5e7eb;margin:24px 0"></div>');
 
-  return `<!DOCTYPE html>
-<html lang="sk">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title}</title>
-<style>
-  *{box-sizing:border-box}
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px 28px;color:#111;background:#fff;font-size:13px}
-  .page-2{margin-top:40px;padding-top:28px;border-top:3px solid #1e3a5f}
-  @media print{
-    body{padding:12px 14px}
-    .no-print{display:none!important}
-    .page-2{page-break-before:always;border-top:none;margin-top:0;padding-top:12px}
-    tr{page-break-inside:avoid}
-  }
-  @media(max-width:600px){body{padding:12px}}
-</style>
-</head>
-<body>
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px">
-    <div>
-      <div style="font-size:11px;color:#6b7280;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">NSE Evidencia</div>
-      <h1 style="font-size:20px;font-weight:700;color:#1e3a5f;margin:0 0 4px">📦 INVENTÚRNY REPORT</h1>
-      <div style="font-size:12px;color:#6b7280">
-        Dátum: <strong style="color:#374151">${date}</strong> &nbsp;·&nbsp;
-        Sklady: <strong style="color:#374151">${invList.length}</strong> &nbsp;·&nbsp;
-        Vygenerované: <strong style="color:#374151">${new Date().toLocaleString('sk-SK')}</strong>
-      </div>
-    </div>
-    <button class="no-print" onclick="window.print()" style="padding:10px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap">🖨️ Tlačiť / Uložiť PDF</button>
-  </div>
-
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px;padding:12px 16px;background:#f0f7ff;border-radius:10px;border-left:4px solid #1d4ed8">
-    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#1d4ed8">${totalAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Celkom</div></div>
-    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#166534">${okAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Sedí</div></div>
-    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#d97706">${overAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Prebytok</div></div>
-    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#dc2626">${underAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Chýba</div></div>
-    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#6b7280">${skipAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Preskočené</div></div>
-    ${notDone>0?`<div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#9ca3af">${notDone}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Neskont.</div></div>`:''}
-  </div>
-
-  <h2 style="font-size:15px;font-weight:700;color:#991b1b;margin:0 0 12px;display:flex;align-items:center;gap:10px">
-    ⚠ STRANA 1 — Rozdiely a nezrovnalosti
-    <span style="font-size:11px;font-weight:400;color:#6b7280">${diffItems.length} položiek na riešenie</span>
-  </h2>
-  ${diffItems.length===0
-    ? '<div style="padding:14px;background:#dcfce7;border-radius:8px;color:#166534;font-weight:600;font-size:14px;margin-bottom:20px">✓ Výborné — žiadne rozdiely! Všetky položky sedia.</div>'
-    : diffSections}
-
-  <div class="page-2">
-    <h2 style="font-size:15px;font-weight:700;color:#1e3a5f;margin:0 0 16px">📋 STRANA 2 — Kompletný zoznam (príloha)</h2>
-    ${fullSections}
-  </div>
-
-  <div style="margin-top:28px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
-    NSE Inventúra &nbsp;·&nbsp; Vygenerované: ${new Date().toLocaleString('sk-SK')}
-  </div>
-</body>
-</html>`;
+  return`<!DOCTYPE html><html lang="sk"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px 28px;color:#111;background:#fff;font-size:13px}.p2{margin-top:40px;padding-top:28px;border-top:3px solid #1e3a5f}@media print{body{padding:12px 14px}.no-print{display:none!important}.p2{page-break-before:always;border-top:none;margin-top:0;padding-top:12px}tr{page-break-inside:avoid}}</style></head><body>
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px">
+  <div><div style="font-size:11px;color:#6b7280;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">NSE Evidencia</div><h1 style="font-size:20px;font-weight:700;color:#1e3a5f;margin:0 0 4px">📦 INVENTÚRNY REPORT</h1><div style="font-size:12px;color:#6b7280">Dátum: <strong>${date}</strong> · Sklady: <strong>${invList.length}</strong> · Vygenerované: <strong>${new Date().toLocaleString('sk-SK')}</strong></div></div>
+  <button class="no-print" onclick="window.print()" style="padding:10px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap">🖨️ Tlačiť / PDF</button>
+</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px;padding:12px 16px;background:#f0f7ff;border-radius:10px;border-left:4px solid #1d4ed8">
+  <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#1d4ed8">${tot}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Celkom</div></div>
+  <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#166534">${ok}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Sedí</div></div>
+  <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#d97706">${over}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Prebytok</div></div>
+  <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#dc2626">${under}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Chýba</div></div>
+  <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#6b7280">${skip}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Preskočené</div></div>
+  ${notDone>0?`<div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#9ca3af">${notDone}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Neskont.</div></div>`:''}
+</div>
+<h2 style="font-size:15px;font-weight:700;color:#991b1b;margin:0 0 12px;display:flex;align-items:center;gap:10px">⚠ STRANA 1 — Rozdiely <span style="font-size:11px;font-weight:400;color:#6b7280">${diffAll.length} položiek</span></h2>
+${diffAll.length===0?'<div style="padding:14px;background:#dcfce7;border-radius:8px;color:#166534;font-weight:600;margin-bottom:20px">✓ Výborné — žiadne rozdiely!</div>':diffSects}
+<div class="p2"><h2 style="font-size:15px;font-weight:700;color:#1e3a5f;margin:0 0 16px">📋 STRANA 2 — Kompletný zoznam</h2>${fullSects}</div>
+<div style="margin-top:28px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">NSE Inventúra · Vygenerované: ${new Date().toLocaleString('sk-SK')}</div>
+</body></html>`;
 }
-function dlFile(name, cnt, mime){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([cnt],{type:mime}));
-  a.download=name; a.click(); URL.revokeObjectURL(a.href);
-}
-function isoDate(){ return new Date().toISOString().slice(0,10); }
 
-// ═══════════════════════════════════════════════════════
-// FINISH
-// ═══════════════════════════════════════════════════════
+// ═══ FINISH ═══════════════════════════════════════════
 function askFinish(){
-  if(!INV) return;
-  // Označ aktuálny sklad ako dokončený
-  INV.finished = true;
-  INV.finishedDate = new Date().toLocaleDateString('sk-SK');
-  saveDB();
-
-  const sc    = INV.items.filter(x=>x.scanned);
-  const ok    = sc.filter(x=>x.actualQty===x.expectedQty).length;
-  const err   = sc.filter(x=>x.actualQty!==x.expectedQty).length;
-  const skip  = INV.items.filter(x=>x.skipped).length;
-  const notDone = INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-
-  // Koľko skladov je dokončených
-  const doneCount = DB.filter(i=>i.finished).length;
-  const allCount  = DB.length;
-
-  document.getElementById('mo-finish-stats').innerHTML =
-    `<div style="font-size:13px;color:var(--text2);margin-bottom:8px">
-       <strong style="color:var(--text)">${INV.skladName}</strong> — ${INV.skladId}
-     </div>
-     <span style="color:var(--green)">✓ Sedí: ${ok}</span> &nbsp;
-     <span style="color:var(--red)">✗ Rozdiel: ${err}</span> &nbsp;
-     <span style="color:var(--amber)">⏭ Preskočené: ${skip}</span> &nbsp;
-     <span style="color:var(--text3)">○ Neskont.: ${notDone}</span>
-     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">
-       Dokončených skladov: <strong style="color:var(--text)">${doneCount} / ${allCount}</strong>
-     </div>`;
-
-  document.getElementById('mo-finish-inv-count').textContent =
-    doneCount > 1 ? doneCount+' skladov' : 'tohto skladu';
-
+  if(!INV)return;
+  INV.finished=true;INV.finishedDate=new Date().toLocaleDateString('sk-SK');saveDB();
+  const sc=INV.items.filter(x=>x.scanned),ok=sc.filter(x=>x.actualQty===x.expectedQty).length,err=sc.filter(x=>x.actualQty!==x.expectedQty).length,skip=INV.items.filter(x=>x.skipped).length,notDone=INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+  const done=DB.filter(i=>i.finished).length;
+  document.getElementById('fin-stats').innerHTML=`<div style="font-size:13px;color:var(--text2);margin-bottom:8px"><strong style="color:var(--text)">${INV.skladName}</strong></div><span style="color:var(--green)">✓ Sedí: ${ok}</span> &nbsp;<span style="color:var(--red)">✗ Rozdiel: ${err}</span> &nbsp;<span style="color:var(--amber)">⏭ Preskočené: ${skip}</span> &nbsp;<span style="color:var(--text3)">○ Neskont.: ${notDone}</span><div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">Dokončených skladov: <strong style="color:var(--text)">${done} / ${DB.length}</strong></div>`;
+  document.getElementById('fin-count').textContent=done>1?done+' skladov':'tohto skladu';
   openMo('mo-finish');
 }
-
-// Pokračuj so skenovaním ďalšieho skladu
-function continueNextSklad(){
+function continueNext(){closeMo('mo-finish');INV=null;startSkladScan();}
+function finishAll(){
   closeMo('mo-finish');
-  INV = null;
-  show('s-scan');
-  document.getElementById('scan-title').textContent = 'Naskenuj QR kód ďalšieho skladu';
-  document.getElementById('scan-sub').textContent   = 'Priblíž tablet ku QR kódu na dverách';
-  document.getElementById('topbar-badge').style.display = 'none';
-  document.getElementById('prog-bar').style.width = '0%';
-  document.getElementById('prog-label').textContent = 'Čakám na QR kód skladu...';
-  ['cnt-ok','cnt-over','cnt-under'].forEach(id=>document.getElementById(id).textContent='–');
-  startCam();
-}
-
-// Ukončí inventúru a vygeneruje jeden PDF pre všetky sklady
-function finishAllAndPDF(){
-  closeMo('mo-finish');
-  // Označ všetky nedokončené ako dokončené
-  DB.forEach(inv=>{ if(!inv.finished){ inv.finished=true; inv.finishedDate=new Date().toLocaleDateString('sk-SK'); } });
+  DB.forEach(inv=>{if(!inv.finished){inv.finished=true;inv.finishedDate=new Date().toLocaleDateString('sk-SK');}});
   saveDB();
-
-  const doneInvs = DB.filter(i=>i.items && i.items.length > 0);
-  if(!doneInvs.length){ toast('Žiadne dáta na export','err'); return; }
-
-  toast('Generujem PDF...','info');
-  setTimeout(()=>{
-    exportAllPDF(doneInvs);
-  }, 300);
+  const list=DB.filter(i=>i.items&&i.items.length>0);
+  if(!list.length){toast('Žiadne dáta','err');return;}
+  exportReport(list);
+  setTimeout(goWelcome,800);
 }
 
-// ═══════════════════════════════════════════════════════
-// MODALS / UTILS
-// ═══════════════════════════════════════════════════════
-function openMo(id){ document.getElementById(id).classList.add('open'); }
-function closeMo(id){ document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.mo').forEach(mo=>mo.addEventListener('click',e=>{ if(e.target===mo) closeMo(mo.id); }));
-
-function toast(msg, type){
-  const old=document.querySelector('.toast'); if(old) old.remove();
-  const t=document.createElement('div'); t.className='toast '+(type||'info'); t.textContent=msg;
-  document.body.appendChild(t);
-  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity 0.3s'; setTimeout(()=>t.remove(),300); }, 2200);
+// ═══ SYNC ══════════════════════════════════════════════
+function openSync(){
+  const sel=document.getElementById('sync-sel');
+  sel.innerHTML=DB.map((inv,i)=>`<option value="${i}">${inv.skladName||inv.skladId} (${inv.items.filter(x=>x.scanned||x.skipped).length}/${inv.items.length})</option>`).join('');
+  document.getElementById('sync-qr-wrap').style.display='none';
+  openMo('mo-sync');
+}
+function syncGenQR(){
+  const idx=parseInt(document.getElementById('sync-sel').value);
+  const inv=DB[idx]; if(!inv){toast('Vyber sklad','warn');return;}
+  const payload={t:'NSE_SYNC',v:'1',sid:inv.skladId,snm:inv.skladName,dt:inv.date,its:inv.items.filter(x=>x.scanned||x.skipped||x.isExtra).map(it=>({v:it.vcm||'',id:it.itemId||'',aq:it.actualQty,sc:it.scanned?1:0,sk:it.skipped?1:0,ex:it.isExtra?1:0,nt:it.note||''}))};
+  const json=JSON.stringify(payload);
+  const wrap=document.getElementById('sync-qr-canvas');
+  const info=document.getElementById('sync-qr-info');
+  document.getElementById('sync-qr-wrap').style.display='block';
+  wrap.innerHTML='';
+  if(json.length>2800){info.innerHTML='⚠ Príliš veľa dát ('+json.length+' znakov). Použi Zálohovať priebeh.';info.style.color='var(--amber)';return;}
+  info.textContent='Načítavam QR knižnicu...';info.style.color='var(--text3)';
+  const doGen=()=>{wrap.innerHTML='';try{new QRCode(wrap,{text:json,width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.L});info.textContent=json.length+' znakov · '+payload.its.length+' položiek';}catch(e){info.textContent='Chyba: '+e.message;info.style.color='var(--red)';}};
+  if(window._qrCodeReady&&typeof QRCode!=='undefined'){doGen();return;}
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  s.onload=()=>{window._qrCodeReady=true;doGen();};
+  s.onerror=()=>{info.innerHTML='⚠ Offline. Použi <strong>💾 Zálohovať priebeh</strong>.';info.style.color='var(--amber)';};
+  document.head.appendChild(s);
+}
+function startSyncScan(){_syncScanMode=true;lastRaw='';startSkladScan();}
+function processSyncQR(raw){
+  _syncScanMode=false;stopCam();
+  try{
+    const p=JSON.parse(raw);if(p.t!=='NSE_SYNC')throw new Error();
+    const idx=DB.findIndex(i=>i.skladId===p.sid);
+    if(idx<0){toast('Sklad '+p.sid+' nie je importovaný','err');goWelcome();return;}
+    const inv=DB[idx];let merged=0,conflicts=0;
+    p.its.forEach(si=>{
+      const loc=inv.items.find(x=>(si.id&&x.itemId===si.id)||(si.v&&x.vcm===si.v));if(!loc)return;
+      if(si.sc&&!loc.scanned){loc.actualQty=si.aq;loc.scanned=true;loc.skipped=false;if(si.nt)loc.note=si.nt;merged++;}
+      else if(si.sc&&loc.scanned&&si.aq!==loc.actualQty) conflicts++;
+      else if(si.sk&&!loc.scanned&&!loc.skipped){loc.skipped=true;merged++;}
+    });
+    saveDB();
+    toast(merged>0?'✓ Zlúčených '+merged+' položiek'+(conflicts>0?' ('+conflicts+' konfliktov)':''):'Žiadne nové dáta'+(conflicts>0?' ('+conflicts+' konfliktov)':''),merged>0?'ok':'warn');
+    INV=DB[idx];showUvit();
+  }catch(e){toast('Neplatný sync QR','err');goWelcome();}
 }
 
-// ═══════════════════════════════════════════════════════
-// PWA – Service Worker
-// ═══════════════════════════════════════════════════════
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
-}
+// ═══ UTILS ════════════════════════════════════════════
+function toast(msg,type){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast '+(type||'info');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity 0.3s';setTimeout(()=>t.remove(),300);},2200);}
+function dlFile(name,cnt,mime){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([cnt],{type:mime}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
+function isoDate(){return new Date().toISOString().slice(0,10);}
 
-// ═══════════════════════════════════════════════════════
-// PAGE VISIBILITY — upozornenie pri návrate do app
-// ═══════════════════════════════════════════════════════
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && INV && !INV.finished){
-    // Používateľ sa vrátil do app počas inventúry
-    const notDone = INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-    if(notDone > 0){
-      toast('Pokračuješ v inventúre: '+notDone+' položiek zostáva','info');
-    }
-    // Automaticky zálohovať pri každom návrate (ticho)
-    try{
-      const zaloha = { type:'NSE_INVENTURA_ZALOHA', version:'1.0', saved:new Date().toISOString(), db:DB };
-      localStorage.setItem('nse_inv_autosave', JSON.stringify(zaloha));
-    }catch(e){}
+// ═══ jsQR LOADER ══════════════════════════════════════
+window._jsQRReady=false;window._qrCodeReady=false;
+(function(){const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';s.onload=()=>window._jsQRReady=true;document.head.appendChild(s);})();
+
+// ═══ PAGE VISIBILITY ══════════════════════════════════
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&INV&&!INV.finished){
+    const notDone=INV.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+    if(notDone>0) toast('Pokračuješ v inventúre: '+notDone+' položiek zostáva','info');
+    try{localStorage.setItem('nse_inv_autosave',JSON.stringify({type:'NSE_INVENTURA_ZALOHA',saved:new Date().toISOString(),db:DB}));}catch(e){}
   }
 });
 
-// Obnov z autosave ak chýba hlavná DB
+// ═══ INIT ═════════════════════════════════════════════
 (function(){
-  const main = localStorage.getItem('nse_inv_db');
-  if((!main || main === '[]') ){
-    const auto = localStorage.getItem('nse_inv_autosave');
-    if(auto){
-      try{
-        const data = JSON.parse(auto);
-        if(data.db && data.db.length > 0){
-          DB = data.db;
-          saveDB();
-          toast('Obnovené z automatickej zálohy','info');
-        }
-      }catch(e){}
-    }
-  }
+  // Obnov z autosave ak je DB prázdna
+  const main=localStorage.getItem('nse_inv_db');
+  if(!main||main==='[]'){const auto=localStorage.getItem('nse_inv_autosave');if(auto){try{const d=JSON.parse(auto);if(d.db&&d.db.length>0){DB=d.db;saveDB();toast('Obnovené z automatickej zálohy','info');}}catch(e){}}}
+  // Zobraz app
+  document.getElementById('the-app').style.display='flex';
+  renderList();
 })();
-
-// ═══════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════
-renderList();
 </script>
 </body>
 </html>
