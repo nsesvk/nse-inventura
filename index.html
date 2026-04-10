@@ -12,13 +12,22 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <script>
-// Načítaj jsQR asynchrónne - ak nie je dostupné, použijeme BarcodeDetector
+// jsQR — skenovanie QR kódov kamerou
 window._jsQRReady = false;
 (function(){
   var s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
   s.onload = function(){ window._jsQRReady = true; };
   s.onerror = function(){ window._jsQRReady = false; };
+  document.head.appendChild(s);
+})();
+// qrcodejs — generovanie QR kódov (sync, export)
+window._qrCodeReady = false;
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  s.onload = function(){ window._qrCodeReady = true; };
+  s.onerror = function(){ window._qrCodeReady = false; };
   document.head.appendChild(s);
 })();
 </script>
@@ -779,7 +788,7 @@ function syncGenerateQR(){
   const inv = DB[idx];
   if(!inv){ toast('Vyber sklad','warn'); return; }
 
-  // Skomprimuj — len potrebné dáta (scanned položky)
+  // Skomprimuj — len scanned/skipped/extra položky
   const payload = {
     t:   'NSE_SYNC',
     v:   '1',
@@ -799,31 +808,63 @@ function syncGenerateQR(){
 
   const json = JSON.stringify(payload);
   const infoEl = document.getElementById('sync-qr-info');
+  const wrap   = document.getElementById('sync-qr-canvas');
+  document.getElementById('sync-qr-wrap').style.display = 'block';
 
-  // Skontroluj veľkosť — QR má limit ~2900 znakov pre M úroveň
+  // Príliš veľa dát pre QR
   if(json.length > 2800){
-    infoEl.textContent = '⚠ Príliš veľa dát pre QR ('+json.length+' znakov). Exportuj JSON zálohu namiesto toho.';
+    wrap.innerHTML = '';
+    infoEl.innerHTML = '⚠ Príliš veľa dát pre QR (<strong>'+json.length+'</strong> znakov, limit 2800).<br>Použi <strong>💾 Zálohovať priebeh</strong> a pošli JSON súbor druhému tabletu.';
     infoEl.style.color = 'var(--amber)';
-    document.getElementById('sync-qr-wrap').style.display='block';
-    document.getElementById('sync-qr-canvas').innerHTML = '';
     return;
   }
 
-  const wrap = document.getElementById('sync-qr-canvas');
-  wrap.innerHTML = '';
-  if(typeof QRCode !== 'undefined'){
-    new QRCode(wrap, {
-      text: json,
-      width: 200, height: 200,
-      colorDark: '#000', colorLight: '#fff',
-      correctLevel: QRCode.CorrectLevel.L  // L = väčší obsah
-    });
-    infoEl.textContent = json.length+' znakov · '+payload.its.length+' položiek';
-    infoEl.style.color = 'var(--text3)';
-  } else {
-    wrap.innerHTML = '<div style="padding:20px;font-size:12px;color:var(--text3)">QR knižnica sa načítava...</div>';
+  wrap.innerHTML = '<div style="padding:16px;font-size:12px;color:#888;text-align:center">⏳ Generujem QR kód...</div>';
+  infoEl.textContent = '';
+
+  // Funkcia ktorá skutočne vygeneruje QR
+  const doGenerate = () => {
+    wrap.innerHTML = '';
+    try{
+      new QRCode(wrap, {
+        text: json,
+        width: 220, height: 220,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.L
+      });
+      infoEl.textContent = json.length+' znakov · '+payload.its.length+' položiek skontrolovaných';
+      infoEl.style.color = 'var(--text3)';
+    }catch(e){
+      wrap.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--red)">Chyba: '+e.message+'</div>';
+    }
+  };
+
+  // Ak je knižnica ready — generuj hneď
+  if(window._qrCodeReady && typeof QRCode !== 'undefined'){
+    doGenerate();
+    return;
   }
-  document.getElementById('sync-qr-wrap').style.display='block';
+
+  // Ak ešte nie je načítaná — načítaj znova a čakaj
+  infoEl.textContent = 'Načítavam knižnicu...';
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  script.onload = () => {
+    window._qrCodeReady = true;
+    doGenerate();
+  };
+  script.onerror = () => {
+    // Offline fallback — zobraz text namiesto QR
+    wrap.innerHTML = '';
+    const pre = document.createElement('div');
+    pre.style.cssText = 'font-family:monospace;font-size:9px;word-break:break-all;padding:10px;background:#f3f4f6;border-radius:6px;max-height:120px;overflow-y:auto;color:#111';
+    pre.textContent = json;
+    wrap.appendChild(pre);
+    infoEl.innerHTML = '⚠ Offline — skopíruj tento text manuálne a vlož ho na druhom tablete.<br><button onclick="navigator.clipboard&&navigator.clipboard.writeText(''+json.replace(/'/g,"\'")+'')" style="margin-top:6px;padding:4px 10px;font-size:11px;cursor:pointer;border-radius:4px;border:1px solid #ccc;background:#fff">📋 Kopírovať</button>';
+    infoEl.style.color = 'var(--amber)';
+  };
+  document.head.appendChild(script);
 }
 
 let _syncScanMode = false;
