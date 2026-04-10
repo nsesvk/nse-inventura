@@ -193,6 +193,31 @@ canvas#qr-canvas{display:none}
 .scan-flash{position:fixed;inset:0;pointer-events:none;z-index:500;animation:scanFlash 0.4s ease forwards}
 .scan-flash.ok{background:rgba(46,204,113,0.25)}
 .scan-flash.err{background:rgba(231,76,60,0.2)}
+
+/* Rýchly mód */
+.quick-sedi{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;padding:22px 16px;border-radius:var(--rl);
+  background:var(--green-bg);border:2px solid var(--green);
+  color:var(--green);font-size:22px;font-weight:700;
+  cursor:pointer;gap:12px;transition:all 0.12s;
+  font-family:var(--font);-webkit-appearance:none;
+  margin-bottom:10px;
+}
+.quick-sedi:active{transform:scale(0.97);background:var(--green);color:#000}
+.quick-sedi .qs-exp{font-size:14px;font-weight:400;opacity:0.8}
+.quick-iny{
+  width:100%;padding:13px;border-radius:var(--r);
+  background:transparent;border:1px solid var(--border2);
+  color:var(--text2);font-size:14px;cursor:pointer;
+  font-family:var(--font);-webkit-appearance:none;
+  transition:all 0.12s;
+}
+.quick-iny:active{background:var(--bg3)}
+.numpad-wrap{display:none}
+.numpad-wrap.open{display:block}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.numpad-wrap.open{animation:slideDown 0.18s ease}
 </style>
 </head>
 <body>
@@ -238,6 +263,13 @@ canvas#qr-canvas{display:none}
           <p>Klepni sem a vyber JSON súbor exportovaný z NSE Evidencie</p>
         </label>
         <input type="file" id="file-inp" accept=".json,.JSON" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+      </div>
+
+      <!-- Synchronizácia -->
+      <div class="card">
+        <div class="card-title">Synchronizácia medzi tabletmi</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Pracujete dvaja súčasne? Exportuj priebeh jedného skladu ako QR kód a druhý tablet ho naskenuje.</p>
+        <button class="btn full" style="color:var(--accent);border-color:var(--accent)" onclick="openSync()">🔄 Otvoriť synchronizáciu</button>
       </div>
 
       <!-- Záloha / Obnova -->
@@ -333,56 +365,90 @@ canvas#qr-canvas{display:none}
     <div class="screen" id="s-item">
       <div class="scan-header">
         <button class="back-btn" onclick="goScan()">← Skenovať</button>
-        <div class="scan-title">Kontrola položky</div>
+        <div>
+          <div class="scan-title">Kontrola položky</div>
+          <div style="font-size:11px;color:var(--text3)" id="item-progress-label"></div>
+        </div>
       </div>
 
+      <!-- Karta položky -->
       <div class="item-card" id="item-card">
         <div class="item-vcm" id="item-vcm"></div>
         <div class="item-name" id="item-name"></div>
-        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <span class="tag info" id="item-typ"></span>
           <span class="tag" id="item-zmj" style="background:var(--bg3);color:var(--text2)"></span>
           <span class="tag" id="item-sklad-tag" style="background:var(--bg3);color:var(--text3)"></span>
         </div>
+        <!-- Detaily RNU / Šarža ak existujú -->
+        <div id="item-details" style="font-size:11px;color:var(--text3);margin-bottom:10px;display:none"></div>
         <div class="counts-grid">
-          <div class="count-box exp"><div class="cn" id="exp-qty">0</div><div class="cl">Evidencia</div></div>
-          <div class="count-box act" id="act-box"><div class="cn" id="act-qty">–</div><div class="cl">Skutočnosť</div></div>
+          <div class="count-box exp">
+            <div class="cn" id="exp-qty">0</div>
+            <div class="cl">Evidencia</div>
+          </div>
+          <div class="count-box act" id="act-box">
+            <div class="cn" id="act-qty">–</div>
+            <div class="cl">Skutočnosť</div>
+          </div>
         </div>
-        <div class="diff-row">
+        <div class="diff-row" id="diff-row" style="display:none">
           <span class="dl">Rozdiel</span>
           <span class="dv" id="diff-val">–</span>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Zadaj skutočný počet</div>
-        <div class="numpad-display" id="np-display">–</div>
-        <div class="numpad">
-          <button class="np-btn" onclick="np('1')">1</button>
-          <button class="np-btn" onclick="np('2')">2</button>
-          <button class="np-btn" onclick="np('3')">3</button>
-          <button class="np-btn" onclick="np('4')">4</button>
-          <button class="np-btn" onclick="np('5')">5</button>
-          <button class="np-btn" onclick="np('6')">6</button>
-          <button class="np-btn" onclick="np('7')">7</button>
-          <button class="np-btn" onclick="np('8')">8</button>
-          <button class="np-btn" onclick="np('9')">9</button>
-          <button class="np-btn del" onclick="npDel()">⌫</button>
-          <button class="np-btn zero" onclick="np('0')">0</button>
-        </div>
-        <div class="action-row">
-          <button class="btn am full" onclick="confirmItem(true)">⏭ Preskočiť</button>
-          <button class="btn ok full" id="btn-confirm" onclick="confirmItem(false)"
-            onpointerdown="startLongPress()" onpointerup="cancelLongPress()" onpointerleave="cancelLongPress()"
-            disabled>✓ Potvrdiť &nbsp;<span style="font-size:10px;opacity:0.6">(drž = sedí)</span></button>
-        </div>
-        <div id="btn-reopen-wrap" style="display:none;margin-top:8px">
-          <button class="btn full" style="font-size:12px;color:var(--amber);border-color:var(--amber)" onclick="reopenItem()">✏️ Opraviť zadaný počet</button>
+      <!-- RÝCHLY MÓD — primárna akcia -->
+      <div id="quick-mode">
+        <button class="quick-sedi" onclick="quickSedi()"
+          onpointerdown="this.style.transform='scale(0.97)'"
+          onpointerup="this.style.transform=''"
+          onpointerleave="this.style.transform=''">
+          <span style="font-size:28px">✓</span>
+          <div>
+            <div>SEDÍ</div>
+            <div class="qs-exp" id="qs-exp-label"></div>
+          </div>
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="quick-iny" onclick="openNumpad()">✏️ Iný počet</button>
+          <button class="quick-iny" style="color:var(--amber);border-color:var(--amber)" onclick="confirmItem(true)">⏭ Preskočiť</button>
         </div>
       </div>
 
-      <!-- Poznámka k položke -->
-      <div class="card">
+      <!-- NUMPAD — skrytý, otvorí sa pri "Iný počet" -->
+      <div class="numpad-wrap" id="numpad-wrap">
+        <div class="card" style="margin-top:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="card-title" style="margin:0">Zadaj skutočný počet</div>
+            <button onclick="closeNumpad()" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;padding:4px 8px">← Späť</button>
+          </div>
+          <div class="numpad-display" id="np-display">–</div>
+          <div class="numpad">
+            <button class="np-btn" onclick="np('1')">1</button>
+            <button class="np-btn" onclick="np('2')">2</button>
+            <button class="np-btn" onclick="np('3')">3</button>
+            <button class="np-btn" onclick="np('4')">4</button>
+            <button class="np-btn" onclick="np('5')">5</button>
+            <button class="np-btn" onclick="np('6')">6</button>
+            <button class="np-btn" onclick="np('7')">7</button>
+            <button class="np-btn" onclick="np('8')">8</button>
+            <button class="np-btn" onclick="np('9')">9</button>
+            <button class="np-btn del" onclick="npDel()">⌫</button>
+            <button class="np-btn zero" onclick="np('0')">0</button>
+          </div>
+          <div class="action-row">
+            <button class="btn am full" onclick="confirmItem(true)">⏭ Preskočiť</button>
+            <button class="btn ok full" id="btn-confirm" onclick="confirmItem(false)" disabled>✓ Potvrdiť</button>
+          </div>
+          <div id="btn-reopen-wrap" style="display:none;margin-top:8px">
+            <button class="btn full" style="font-size:12px;color:var(--amber);border-color:var(--amber)" onclick="reopenItem()">✏️ Opraviť zadaný počet</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Poznámka -->
+      <div class="card" style="margin-top:10px">
         <div class="card-title">Poznámka (voliteľné)</div>
         <div style="display:flex;gap:8px">
           <input type="text" id="item-note" placeholder="napr. poškodené 2 ks, iná séria..."
@@ -425,9 +491,42 @@ canvas#qr-canvas{display:none}
         <button class="btn full" onclick="exportReport('json')">💾 Export JSON</button>
         <button class="btn pr full" onclick="exportPDF(INV)">📄 Export PDF (tento sklad)</button>
       </div>
+      <button class="btn full" style="margin-top:8px;color:var(--accent);border-color:var(--accent)" onclick="openSync()">🔄 Synchronizovať s iným tabletom</button>
       <button class="btn ok full" style="margin-top:8px" onclick="askFinish()">🏁 Ďalší sklad / Ukončiť</button>
     </div>
 
+  </div>
+</div>
+
+<!-- MODAL: Synchronizácia medzi tabletmi -->
+<div class="mo" id="mo-sync">
+  <div class="mo-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0">🔄 Synchronizácia</h2>
+      <button class="btn" style="padding:6px 12px;font-size:12px" onclick="closeMo('mo-sync')">✕</button>
+    </div>
+
+    <!-- Exportuj QR -->
+    <div style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">📤 Odoslať na iný tablet</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Vyber sklad ktorý chceš preniesť — druhý tablet ho naskenuje a zlúči s jeho dátami.</p>
+      <select id="sync-sklad-select" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:9px 10px;font-size:13px;color:var(--text);font-family:var(--font);margin-bottom:10px"></select>
+      <button class="btn pr full" onclick="syncGenerateQR()">Vygenerovať QR kód</button>
+      <div id="sync-qr-wrap" style="display:none;margin-top:12px;text-align:center">
+        <div style="background:#fff;border-radius:var(--r);padding:12px;display:inline-block;margin-bottom:8px">
+          <div id="sync-qr-canvas"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">Druhý tablet naskenuje tento QR kód</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px" id="sync-qr-info"></div>
+      </div>
+    </div>
+
+    <!-- Importuj QR -->
+    <div style="background:var(--bg3);border-radius:var(--r);padding:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">📥 Prijať z iného tabletu</div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Naskenuj QR kód z iného tabletu — výsledky sa zlúčia.</p>
+      <button class="btn ok full" onclick="closeMo('mo-sync');startSyncScan()">📷 Skenovať QR z iného tabletu</button>
+    </div>
   </div>
 </div>
 
@@ -665,6 +764,136 @@ function goResults(){
 // WELCOME / IMPORT
 // ═══════════════════════════════════════════════════════
 function saveDB(){ localStorage.setItem('nse_inv_db', JSON.stringify(DB)); }
+
+// ── SYNCHRONIZÁCIA MEDZI TABLETMI ─────────────────────
+function openSync(){
+  // Naplň select skladov
+  const sel = document.getElementById('sync-sklad-select');
+  sel.innerHTML = DB.map((inv,i)=>`<option value="${i}">${inv.skladName||inv.skladId} (${inv.items.filter(x=>x.scanned||x.skipped).length}/${inv.items.length})</option>`).join('');
+  document.getElementById('sync-qr-wrap').style.display='none';
+  openMo('mo-sync');
+}
+
+function syncGenerateQR(){
+  const idx = parseInt(document.getElementById('sync-sklad-select').value);
+  const inv = DB[idx];
+  if(!inv){ toast('Vyber sklad','warn'); return; }
+
+  // Skomprimuj — len potrebné dáta (scanned položky)
+  const payload = {
+    t:   'NSE_SYNC',
+    v:   '1',
+    sid: inv.skladId,
+    snm: inv.skladName,
+    dt:  inv.date,
+    its: inv.items.filter(x=>x.scanned||x.skipped||x.isExtra).map(it=>({
+      v:  it.vcm||'',
+      id: it.itemId||'',
+      aq: it.actualQty,
+      sc: it.scanned?1:0,
+      sk: it.skipped?1:0,
+      ex: it.isExtra?1:0,
+      nt: it.note||''
+    }))
+  };
+
+  const json = JSON.stringify(payload);
+  const infoEl = document.getElementById('sync-qr-info');
+
+  // Skontroluj veľkosť — QR má limit ~2900 znakov pre M úroveň
+  if(json.length > 2800){
+    infoEl.textContent = '⚠ Príliš veľa dát pre QR ('+json.length+' znakov). Exportuj JSON zálohu namiesto toho.';
+    infoEl.style.color = 'var(--amber)';
+    document.getElementById('sync-qr-wrap').style.display='block';
+    document.getElementById('sync-qr-canvas').innerHTML = '';
+    return;
+  }
+
+  const wrap = document.getElementById('sync-qr-canvas');
+  wrap.innerHTML = '';
+  if(typeof QRCode !== 'undefined'){
+    new QRCode(wrap, {
+      text: json,
+      width: 200, height: 200,
+      colorDark: '#000', colorLight: '#fff',
+      correctLevel: QRCode.CorrectLevel.L  // L = väčší obsah
+    });
+    infoEl.textContent = json.length+' znakov · '+payload.its.length+' položiek';
+    infoEl.style.color = 'var(--text3)';
+  } else {
+    wrap.innerHTML = '<div style="padding:20px;font-size:12px;color:var(--text3)">QR knižnica sa načítava...</div>';
+  }
+  document.getElementById('sync-qr-wrap').style.display='block';
+}
+
+let _syncScanMode = false;
+function startSyncScan(){
+  _syncScanMode = true;
+  lastRaw = '';
+  // Použi scan screen v sync móde
+  show('s-scan');
+  document.getElementById('scan-title').textContent = 'Skenuj QR z iného tabletu';
+  document.getElementById('scan-sub').textContent   = 'Priblíž kameru ku QR kódu na druhom tablete';
+  document.getElementById('topbar-badge').style.display='none';
+  document.getElementById('prog-bar').style.width='0%';
+  document.getElementById('prog-label').textContent='Čakám na sync QR kód...';
+  startCam();
+}
+
+function processSyncQR(payload){
+  _syncScanMode = false;
+  stopCam();
+
+  try{
+    const p = typeof payload === 'string' ? JSON.parse(payload) : payload;
+    if(p.t !== 'NSE_SYNC') throw new Error('Nie je sync QR');
+
+    // Nájdi inventúru pre tento sklad
+    const invIdx = DB.findIndex(i=>i.skladId===p.sid);
+    if(invIdx < 0){
+      toast('Sklad '+p.sid+' nie je importovaný — najprv importuj JSON','err');
+      goWelcome(); return;
+    }
+
+    const inv = DB[invIdx];
+    let merged = 0, conflicts = 0;
+
+    // Zlúč položky — druhý tablet mohol skenovať iné položky
+    p.its.forEach(syncIt=>{
+      const local = inv.items.find(x=>
+        (syncIt.id && x.itemId===syncIt.id) ||
+        (syncIt.v  && x.vcm===syncIt.v)
+      );
+      if(!local) return;
+
+      if(syncIt.sc && !local.scanned){
+        // Druhý tablet naskenoval túto položku, my nie — preberieme
+        local.actualQty = syncIt.aq;
+        local.scanned   = true;
+        local.skipped   = false;
+        if(syncIt.nt) local.note = syncIt.nt;
+        merged++;
+      } else if(syncIt.sc && local.scanned && syncIt.aq !== local.actualQty){
+        // Obaja skenovali — conflict, necháme lokálnu hodnotu
+        conflicts++;
+      } else if(syncIt.sk && !local.scanned && !local.skipped){
+        local.skipped = true;
+        merged++;
+      }
+    });
+
+    saveDB();
+    const msg = merged>0
+      ? '✓ Zlúčených '+merged+' položiek'+(conflicts>0?' ('+conflicts+' konfliktov — zachovaná lokálna hodnota)':'')
+      : 'Žiadne nové dáta na zlúčenie'+(conflicts>0?' ('+conflicts+' konfliktov)':'');
+    toast(msg, merged>0?'ok':'warn');
+    INV = DB[invIdx];
+    showSkladUvit();
+  }catch(e){
+    toast('Neplatný sync QR kód','err');
+    goWelcome();
+  }
+}
 
 // ── ZÁLOHA PRIEBEHU ──────────────────────────────────
 function zalohaExport(){
@@ -1125,6 +1354,8 @@ function parseQR(raw){
     const o=JSON.parse(raw);
     // QR kód skladu
     if(o.type==='NSE_SKLAD') return {type:'sklad', id:o.id, name:o.name};
+    // Sync QR medzi tabletmi
+    if(o.t==='NSE_SYNC') return {type:'sync', raw:raw};
     // QR kód položky — nový formát s viacerými atribútmi
     if(o.t==='NSE_ITEM') return {
       type: 'item',
@@ -1146,6 +1377,12 @@ function parseQR(raw){
 function onQR(raw){
   const p=parseQR(raw);
   const st=document.getElementById('cam-status');
+  if(p.type==='sync'){
+    soundScan();
+    st.textContent='✓ Sync QR načítaný'; st.className='cam-status active';
+    processSyncQR(raw);
+    return;
+  }
   if(p.type==='sklad'){
     soundScan();
     st.textContent='✓ Sklad: '+p.name; st.className='cam-status active';
@@ -1295,25 +1532,87 @@ document.getElementById('manual-vcm').addEventListener('keydown',e=>{ if(e.key==
 // ═══════════════════════════════════════════════════════
 function renderItem(){
   const it=ITEM;
-  // Zobraz VČM ak existuje, inak itemId
-  document.getElementById('item-vcm').textContent     = it.vcm ? it.vcm : (it.itemId||'–');
-  document.getElementById('item-name').textContent    = it.name;
-  document.getElementById('item-typ').textContent     = it.typ + (it.zt?' · ZT '+it.zt:'') + (it.kat?' · Kat.'+it.kat:'');
-  document.getElementById('item-zmj').textContent     = it.zmj;
+  document.getElementById('item-vcm').textContent  = it.vcm ? it.vcm : (it.itemId||'–');
+  document.getElementById('item-name').textContent = it.name;
+  document.getElementById('item-typ').textContent  = it.typ + (it.zt?' · ZT '+it.zt:'') + (it.kat?' · Kat.'+it.kat:'');
+  document.getElementById('item-zmj').textContent  = it.zmj;
   document.getElementById('item-sklad-tag').textContent = INV.skladId;
-  document.getElementById('exp-qty').textContent      = it.expectedQty;
-  document.getElementById('act-qty').textContent      = it.actualQty!==null ? it.actualQty : '–';
-  document.getElementById('np-display').textContent   = '–';
-  document.getElementById('btn-confirm').disabled     = true;
+  document.getElementById('exp-qty').textContent   = it.expectedQty;
+  document.getElementById('act-qty').textContent   = it.actualQty!==null ? it.actualQty : '–';
+
+  // Detaily RNU / Šarža
+  const detEl = document.getElementById('item-details');
+  const details = [it.rnu?'RNU: '+it.rnu:'', it.sarza?'Šarža: '+it.sarza:'', it.evCislo?'Ev.č.: '+it.evCislo:''].filter(Boolean).join('  ·  ');
+  if(detEl){ detEl.textContent=details; detEl.style.display=details?'block':'none'; }
+
+  // Progres label
+  const progEl = document.getElementById('item-progress-label');
+  if(progEl && INV){
+    const done  = INV.items.filter(x=>x.scanned||x.skipped).length;
+    const total = INV.items.length;
+    progEl.textContent = done+'/'+total+' skontrolovaných';
+  }
+
+  // Reset stavov
   document.getElementById('item-card').className      = 'item-card';
-  document.getElementById('btn-reopen-wrap').style.display = 'none';
+  document.getElementById('diff-row').style.display   = 'none';
   document.getElementById('diff-val').textContent     = '–';
   document.getElementById('diff-val').className       = 'dv';
   document.getElementById('act-box').className        = 'count-box act';
-  const noteEl=document.getElementById('item-note');
-  if(noteEl) noteEl.value=it.note||'';
-  const hintEl=document.getElementById('note-saved-hint');
-  if(hintEl) hintEl.textContent=it.note?'✓ Poznámka uložená':'';
+  document.getElementById('btn-reopen-wrap').style.display = 'none';
+
+  // Numpad reset
+  npVal = '';
+  document.getElementById('np-display').textContent = '–';
+  document.getElementById('btn-confirm').disabled   = true;
+
+  // Rýchly mód — label s očakávaným počtom
+  document.getElementById('qs-exp-label').textContent = it.expectedQty + ' ' + it.zmj + ' podľa evidencie';
+
+  // Ak položka už bola skontrolovaná (oprava), zobraz numpad rovno
+  if(it.scanned && it.actualQty !== null){
+    npVal = String(it.actualQty);
+    document.getElementById('np-display').textContent = npVal;
+    document.getElementById('btn-confirm').disabled = false;
+    openNumpad();
+    updateLiveDiff();
+  } else {
+    closeNumpad();
+  }
+
+  // Poznámka
+  const noteEl = document.getElementById('item-note');
+  if(noteEl) noteEl.value = it.note||'';
+  const hintEl = document.getElementById('note-saved-hint');
+  if(hintEl) hintEl.textContent = it.note?'✓ Poznámka uložená':'';
+}
+
+function openNumpad(){
+  document.getElementById('quick-mode').style.display = 'none';
+  const wrap = document.getElementById('numpad-wrap');
+  wrap.classList.add('open');
+  // Scrolluj na numpad
+  setTimeout(()=>wrap.scrollIntoView({behavior:'smooth',block:'start'}), 50);
+}
+
+function closeNumpad(){
+  document.getElementById('quick-mode').style.display = 'block';
+  const wrap = document.getElementById('numpad-wrap');
+  wrap.classList.remove('open');
+  npVal = '';
+  document.getElementById('np-display').textContent = '–';
+  document.getElementById('btn-confirm').disabled = true;
+  document.getElementById('act-qty').textContent = ITEM.actualQty!==null ? ITEM.actualQty : '–';
+  document.getElementById('act-box').className = 'count-box act';
+  document.getElementById('diff-row').style.display = 'none';
+  document.getElementById('item-card').className = 'item-card';
+}
+
+// Rýchle potvrdenie — sedí (1 klepnutie)
+function quickSedi(){
+  if(!ITEM) return;
+  npVal = String(ITEM.expectedQty);
+  doConfirmItem();
 }
 
 function np(d){
@@ -1338,6 +1637,7 @@ function updateLiveDiff(){
   const exp=ITEM.expectedQty;
   const diff=actual-exp;
   document.getElementById('act-qty').textContent=actual;
+  document.getElementById('diff-row').style.display='flex';
   const actBox=document.getElementById('act-box');
   const card=document.getElementById('item-card');
   const dv=document.getElementById('diff-val');
@@ -1466,8 +1766,10 @@ function reopenItem(){
   document.getElementById('act-qty').textContent = '–';
   document.getElementById('act-box').className = 'count-box act';
   document.getElementById('item-card').className = 'item-card';
+  document.getElementById('diff-row').style.display = 'none';
   document.getElementById('diff-val').textContent = '–';
   document.getElementById('diff-val').className = 'dv';
+  openNumpad();
   toast('Zadaj nový počet','info');
 }
 
@@ -1653,7 +1955,7 @@ function exportAllPDF(inventories){
   toast('Report stiahnutý — otvor súbor a vytlač ako PDF','ok');
 }
 
-// Vygeneruje kompletný HTML report (stiahne sa ako súbor, otvorí v prehliadači, tlačí ako PDF)
+// Vygeneruje kompletný HTML report — 2 časti: rozdiely + kompletný zoznam
 function buildPDFDocument(invList, title, date){
   const allItems = invList.flatMap(i=>i.items);
   const totalAll = allItems.length;
@@ -1663,8 +1965,67 @@ function buildPDFDocument(invList, title, date){
   const skipAll  = allItems.filter(x=>x.skipped).length;
   const notDone  = allItems.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
 
+  // ── ČASŤ 1: Len rozdiely ──────────────────────────────
+  const diffItems = allItems.filter(x=>
+    (x.scanned && x.actualQty !== x.expectedQty) ||
+    x.isExtra ||
+    x.skipped ||
+    (!x.scanned && !x.skipped && !x.isExtra)
+  );
+
+  const buildDiffSection = (inv) => {
+    const diffs = inv.items.filter(x=>
+      (x.scanned && x.actualQty !== x.expectedQty) ||
+      x.isExtra || x.skipped || (!x.scanned&&!x.skipped&&!x.isExtra)
+    ).sort((a,b)=>{
+      const r = x => x.isExtra?1:(!x.scanned&&!x.skipped)?5:x.skipped?4:x.actualQty<x.expectedQty?0:x.actualQty>x.expectedQty?1:3;
+      return r(a)-r(b);
+    });
+    if(!diffs.length) return `<div style="color:#16a34a;font-size:13px;padding:10px 0">✓ Všetky položky sedia — žiadne rozdiely</div>`;
+    return buildRows(diffs);
+  };
+
+  const diffSections = invList.map(inv=>{
+    const sc=inv.items.filter(x=>x.scanned);
+    const iDiff=sc.filter(x=>x.actualQty!==x.expectedQty).length;
+    const iExtra=inv.items.filter(x=>x.isExtra).length;
+    const iSkip=inv.items.filter(x=>x.skipped).length;
+    const iNot=inv.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+    if(!iDiff&&!iExtra&&!iSkip&&!iNot) return `
+    <div style="margin-bottom:20px">
+      <div style="font-size:14px;font-weight:700;color:#1e3a5f;margin-bottom:4px">${inv.skladName} <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span></div>
+      <div style="color:#16a34a;font-weight:600;font-size:13px">✓ Všetky položky sedia</div>
+    </div>`;
+    return `
+    <div style="margin-bottom:24px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+        <span style="font-size:14px;font-weight:700;color:#1e3a5f">${inv.skladName}</span>
+        <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span>
+        ${iDiff>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">${iDiff} rozdiel</span>`:''}
+        ${iExtra>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e">${iExtra} navyše</span>`:''}
+        ${iSkip>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f3f4f6;color:#6b7280">${iSkip} preskočené</span>`:''}
+        ${iNot>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f3f4f6;color:#6b7280">${iNot} neskont.</span>`:''}
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:600px">
+          <thead><tr style="background:#7f1d1d">
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">VČM</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">NÁZOV</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">RNU</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">ŠARŽA</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">EVIDENCIA</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">SKUTOČNOSŤ</th>
+            <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">ROZDIEL</th>
+            <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">POZNÁMKA</th>
+          </tr></thead>
+          <tbody>${buildDiffSection(inv)}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── ČASŤ 2: Kompletný zoznam ──────────────────────────
   const sections = invList.map(inv => {
-    // Zoraď: rozdiely a chýbajúce najprv, potom sedí, potom neskontrolované
     inv = {...inv, items: [...inv.items].sort((a,b)=>{
       const rank = x => {
         if(x.isExtra) return 1;
@@ -1758,6 +2119,32 @@ function buildPDFDocument(invList, title, date){
     </div>`;
   }).join('<div style="border-top:2px solid #e5e7eb;margin:28px 0"></div>');
 
+  // Pomocná funkcia pre diff riadky (kratšia tabuľka)
+  function buildRows(items){
+    return items.map((it,idx)=>{
+      const diff = it.scanned ? it.actualQty - it.expectedQty : null;
+      const rowBg = idx%2===0?'#ffffff':'#f8fafc';
+      let stavColor='#6b7280',stavBg='#f3f4f6',stavText='–';
+      if(it.skipped){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='⏭ Preskočené'; }
+      else if(it.isExtra){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='+ Navyše'; }
+      else if(!it.scanned){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='○ Neskont.'; }
+      else if(diff>0){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='▲ +'+diff; }
+      else if(diff<0){ stavColor='#991b1b'; stavBg='#fee2e2'; stavText='▼ '+diff; }
+      return `<tr style="background:${rowBg}">
+        <td style="font-family:monospace;font-size:11px;color:#1d4ed8;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">${it.vcm||'–'}</td>
+        <td style="font-size:12px;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.name||'–'}</td>
+        <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.rnu||'–'}</td>
+        <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.sarza||'–'}</td>
+        <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.expectedQty} ${it.zmj}</td>
+        <td style="font-family:monospace;font-size:11px;font-weight:700;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
+        <td style="text-align:center;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">
+          <span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:700;color:${stavColor};background:${stavBg}">${stavText}</span>
+        </td>
+        <td style="font-size:11px;color:#92400e;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.note||''}</td>
+      </tr>`;
+    }).join('');
+  }
+
   return `<!DOCTYPE html>
 <html lang="sk">
 <head>
@@ -1767,17 +2154,19 @@ function buildPDFDocument(invList, title, date){
 <style>
   *{box-sizing:border-box}
   body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:28px 32px;color:#111;background:#fff;font-size:13px}
+  .page-2{margin-top:40px;padding-top:32px;border-top:3px solid #1e3a5f}
   @media print{
-    body{padding:16px 18px}
+    body{padding:14px 16px}
     .no-print{display:none!important}
     .page-break{page-break-before:always}
+    .page-2{page-break-before:always;border-top:none;margin-top:0;padding-top:16px}
     tr{page-break-inside:avoid}
-    h2{page-break-after:avoid}
   }
-  @media(max-width:600px){body{padding:16px}}
+  @media(max-width:600px){body{padding:14px}}
 </style>
 </head>
 <body>
+  <!-- HLAVIČKA -->
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px">
     <div>
       <div style="font-size:11px;color:#6b7280;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">NSE Evidencia</div>
@@ -1793,6 +2182,7 @@ function buildPDFDocument(invList, title, date){
     </button>
   </div>
 
+  <!-- CELKOVÝ SÚHRN -->
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 24px;padding:14px 18px;background:#f0f7ff;border-radius:10px;border-left:4px solid #1d4ed8">
     <div style="text-align:center;min-width:64px">
       <div style="font-size:24px;font-weight:700;font-family:monospace;color:#1d4ed8">${totalAll}</div>
@@ -1820,7 +2210,20 @@ function buildPDFDocument(invList, title, date){
     </div>`:''}
   </div>
 
-  ${sections}
+  <!-- STRANA 1: Rozdiely -->
+  <div style="margin:24px 0 8px;display:flex;align-items:center;gap:12px">
+    <h2 style="font-size:16px;font-weight:700;color:#991b1b;margin:0">⚠ STRANA 1 — Rozdiely a nezrovnalosti</h2>
+    <span style="font-size:11px;color:#6b7280">(${diffItems.length} položiek na riešenie)</span>
+  </div>
+  ${diffItems.length===0?'<div style="padding:14px;background:#dcfce7;border-radius:8px;color:#166534;font-weight:600;font-size:14px">✓ Výborné — žiadne rozdiely! Všetky položky sedia.</div>':diffSections}
+
+  <!-- STRANA 2: Kompletný zoznam -->
+  <div class="page-2">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <h2 style="font-size:16px;font-weight:700;color:#1e3a5f;margin:0">📋 STRANA 2 — Kompletný zoznam (príloha)</h2>
+    </div>
+    ${sections}
+  </div>
 
   <div style="margin-top:32px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
     NSE Inventúra &nbsp;·&nbsp; Vygenerované: ${new Date().toLocaleString('sk-SK')}
