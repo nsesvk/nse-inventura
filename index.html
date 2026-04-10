@@ -861,7 +861,9 @@ function syncGenerateQR(){
     pre.style.cssText = 'font-family:monospace;font-size:9px;word-break:break-all;padding:10px;background:#f3f4f6;border-radius:6px;max-height:120px;overflow-y:auto;color:#111';
     pre.textContent = json;
     wrap.appendChild(pre);
-    infoEl.innerHTML = '⚠ Offline — skopíruj tento text manuálne a vlož ho na druhom tablete.<br><button onclick="navigator.clipboard&&navigator.clipboard.writeText(''+json.replace(/'/g,"\'")+'')" style="margin-top:6px;padding:4px 10px;font-size:11px;cursor:pointer;border-radius:4px;border:1px solid #ccc;background:#fff">📋 Kopírovať</button>';
+    // Ulož json do globálnej premennej pre kopírovanie
+    window._syncJson = json;
+    infoEl.innerHTML = '⚠ Offline — QR knižnica nie je dostupná. Použi <strong>💾 Zálohovať priebeh</strong> a pošli JSON súbor druhému tabletu.<br><button onclick="if(navigator.clipboard){navigator.clipboard.writeText(window._syncJson||\'\')" style="margin-top:6px;padding:4px 10px;font-size:11px;cursor:pointer;border-radius:4px;border:1px solid #ccc;background:#fff">📋 Kopírovať JSON</button>';
     infoEl.style.color = 'var(--amber)';
   };
   document.head.appendChild(script);
