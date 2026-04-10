@@ -1996,7 +1996,58 @@ function exportAllPDF(inventories){
   toast('Report stiahnutý — otvor súbor a vytlač ako PDF','ok');
 }
 
-// Vygeneruje kompletný HTML report — 2 časti: rozdiely + kompletný zoznam
+// Pomocná: riadky diff tabuľky
+function _pdfDiffRows(items){
+  return items.map((it,idx)=>{
+    const diff = it.scanned ? it.actualQty - it.expectedQty : null;
+    const bg = idx%2===0?'#ffffff':'#f8fafc';
+    let sc='#6b7280',sb='#f3f4f6',st='–';
+    if(it.skipped){sc='#6b7280';sb='#f3f4f6';st='⏭ Preskočené';}
+    else if(it.isExtra){sc='#92400e';sb='#fef3c7';st='+ Navyše';}
+    else if(!it.scanned){sc='#6b7280';sb='#f3f4f6';st='○ Neskont.';}
+    else if(diff>0){sc='#92400e';sb='#fef3c7';st='▲ +'+diff;}
+    else if(diff<0){sc='#991b1b';sb='#fee2e2';st='▼ '+diff;}
+    return `<tr style="background:${bg}">
+      <td style="font-family:monospace;font-size:11px;color:#1d4ed8;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">${it.vcm||'–'}</td>
+      <td style="font-size:12px;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.name||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.rnu||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.sarza||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.expectedQty} ${it.zmj}</td>
+      <td style="font-family:monospace;font-size:11px;font-weight:700;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
+      <td style="text-align:center;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap"><span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:700;color:${sc};background:${sb}">${st}</span></td>
+      <td style="font-size:11px;color:#92400e;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.note||''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Pomocná: kompletné riadky tabuľky (strana 2)
+function _pdfFullRows(items){
+  return items.map((it,idx)=>{
+    const diff = it.scanned ? it.actualQty - it.expectedQty : null;
+    const bg = idx%2===0?'#ffffff':'#f8fafc';
+    let sc='#374151',sb='#f3f4f6',st=getStav(it);
+    if(it.skipped){sc='#6b7280';sb='#f3f4f6';st='⏭ Preskočené';}
+    else if(it.isExtra){sc='#92400e';sb='#fef3c7';st='+ Navyše';}
+    else if(!it.scanned){sc='#6b7280';sb='#f3f4f6';st='○ Neskontrolované';}
+    else if(diff===0){sc='#166534';sb='#dcfce7';st='✓ Sedí';}
+    else if(diff>0){sc='#92400e';sb='#fef3c7';st='▲ +'+diff;}
+    else{sc='#991b1b';sb='#fee2e2';st='▼ '+diff;}
+    return `<tr style="background:${bg}">
+      <td style="font-family:monospace;font-size:11px;color:#1d4ed8;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.vcm||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;color:#374151;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.rnu||'–'}</td>
+      <td style="font-size:12px;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:200px">${it.name||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.sarza||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.evCislo||it.cisloMat||'–'}</td>
+      <td style="font-size:11px;text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280">${it.typ||'–'}</td>
+      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.expectedQty} ${it.zmj}</td>
+      <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;font-weight:700;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
+      <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${sc};background:${sb}">${st}</span></td>
+      <td style="font-size:11px;color:#92400e;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:120px">${it.note||''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Vygeneruje kompletný HTML report — Strana 1: rozdiely, Strana 2: kompletný zoznam
 function buildPDFDocument(invList, title, date){
   const allItems = invList.flatMap(i=>i.items);
   const totalAll = allItems.length;
@@ -2006,40 +2057,36 @@ function buildPDFDocument(invList, title, date){
   const skipAll  = allItems.filter(x=>x.skipped).length;
   const notDone  = allItems.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
 
-  // ── ČASŤ 1: Len rozdiely ──────────────────────────────
+  // Rozdiely celkom
   const diffItems = allItems.filter(x=>
-    (x.scanned && x.actualQty !== x.expectedQty) ||
-    x.isExtra ||
-    x.skipped ||
-    (!x.scanned && !x.skipped && !x.isExtra)
+    (x.scanned && x.actualQty !== x.expectedQty) || x.isExtra || x.skipped || (!x.scanned&&!x.skipped&&!x.isExtra)
   );
 
-  const buildDiffSection = (inv) => {
+  // STRANA 1 — diff sekcie per sklad
+  const diffSections = invList.map(inv=>{
+    const sc     = inv.items.filter(x=>x.scanned);
+    const iDiff  = sc.filter(x=>x.actualQty!==x.expectedQty).length;
+    const iExtra = inv.items.filter(x=>x.isExtra).length;
+    const iSkip  = inv.items.filter(x=>x.skipped).length;
+    const iNot   = inv.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+
+    if(!iDiff&&!iExtra&&!iSkip&&!iNot) return `
+      <div style="margin-bottom:16px;padding:10px 14px;background:#dcfce7;border-radius:8px">
+        <span style="font-size:13px;font-weight:700;color:#1e3a5f">${inv.skladName}</span>
+        <span style="font-family:monospace;font-size:11px;color:#6b7280;margin-left:8px">${inv.skladId}</span>
+        <span style="color:#166534;font-weight:600;font-size:13px;margin-left:10px">✓ Všetky položky sedia</span>
+      </div>`;
+
     const diffs = inv.items.filter(x=>
-      (x.scanned && x.actualQty !== x.expectedQty) ||
-      x.isExtra || x.skipped || (!x.scanned&&!x.skipped&&!x.isExtra)
+      (x.scanned&&x.actualQty!==x.expectedQty)||x.isExtra||x.skipped||(!x.scanned&&!x.skipped&&!x.isExtra)
     ).sort((a,b)=>{
-      const r = x => x.isExtra?1:(!x.scanned&&!x.skipped)?5:x.skipped?4:x.actualQty<x.expectedQty?0:x.actualQty>x.expectedQty?1:3;
+      const r=x=>x.isExtra?1:(!x.scanned&&!x.skipped)?5:x.skipped?4:x.actualQty<x.expectedQty?0:x.actualQty>x.expectedQty?1:3;
       return r(a)-r(b);
     });
-    if(!diffs.length) return `<div style="color:#16a34a;font-size:13px;padding:10px 0">✓ Všetky položky sedia — žiadne rozdiely</div>`;
-    return buildRows(diffs);
-  };
 
-  const diffSections = invList.map(inv=>{
-    const sc=inv.items.filter(x=>x.scanned);
-    const iDiff=sc.filter(x=>x.actualQty!==x.expectedQty).length;
-    const iExtra=inv.items.filter(x=>x.isExtra).length;
-    const iSkip=inv.items.filter(x=>x.skipped).length;
-    const iNot=inv.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-    if(!iDiff&&!iExtra&&!iSkip&&!iNot) return `
-    <div style="margin-bottom:20px">
-      <div style="font-size:14px;font-weight:700;color:#1e3a5f;margin-bottom:4px">${inv.skladName} <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span></div>
-      <div style="color:#16a34a;font-weight:600;font-size:13px">✓ Všetky položky sedia</div>
-    </div>`;
     return `
     <div style="margin-bottom:24px">
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px">
         <span style="font-size:14px;font-weight:700;color:#1e3a5f">${inv.skladName}</span>
         <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span>
         ${iDiff>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">${iDiff} rozdiel</span>`:''}
@@ -2048,7 +2095,7 @@ function buildPDFDocument(invList, title, date){
         ${iNot>0?`<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#f3f4f6;color:#6b7280">${iNot} neskont.</span>`:''}
       </div>
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;min-width:600px">
+        <table style="width:100%;border-collapse:collapse;min-width:560px">
           <thead><tr style="background:#7f1d1d">
             <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">VČM</th>
             <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">NÁZOV</th>
@@ -2059,132 +2106,59 @@ function buildPDFDocument(invList, title, date){
             <th style="padding:6px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">ROZDIEL</th>
             <th style="padding:6px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">POZNÁMKA</th>
           </tr></thead>
-          <tbody>${buildDiffSection(inv)}</tbody>
+          <tbody>${_pdfDiffRows(diffs)}</tbody>
         </table>
       </div>
     </div>`;
   }).join('');
 
-  // ── ČASŤ 2: Kompletný zoznam ──────────────────────────
-  const sections = invList.map(inv => {
-    inv = {...inv, items: [...inv.items].sort((a,b)=>{
-      const rank = x => {
-        if(x.isExtra) return 1;
-        if(!x.scanned && !x.skipped) return 5;
-        if(x.skipped) return 4;
-        if(x.scanned && x.actualQty < x.expectedQty) return 0;
-        if(x.scanned && x.actualQty > x.expectedQty) return 1;
-        if(x.scanned && x.actualQty === x.expectedQty) return 3;
-        return 5;
-      };
-      return rank(a) - rank(b);
-    })};
-    const sc    = inv.items.filter(x=>x.scanned);
-    const iOk   = sc.filter(x=>x.actualQty===x.expectedQty).length;
-    const iOver = sc.filter(x=>x.actualQty>x.expectedQty).length;
-    const iUnder= sc.filter(x=>x.actualQty<x.expectedQty).length;
-    const iSkip = inv.items.filter(x=>x.skipped).length;
-    const iExtra= inv.items.filter(x=>x.isExtra).length;
-    const iNot  = inv.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
-
-    const rows = inv.items.map((it,idx) => {
-      const diff  = it.scanned ? it.actualQty - it.expectedQty : null;
-      const stav  = getStav(it);
-      const isOdd = idx % 2 === 0;
-      const rowBg = isOdd ? '#ffffff' : '#f8fafc';
-
-      let stavColor='#374151', stavBg='#f3f4f6', stavText=stav;
-      if(it.skipped){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='⏭ Preskočené'; }
-      else if(it.isExtra){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='+ Navyše'; }
-      else if(!it.scanned){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='○ Neskontrolované'; }
-      else if(diff===0){ stavColor='#166534'; stavBg='#dcfce7'; stavText='✓ Sedí'; }
-      else if(diff>0){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='▲ +'+diff; }
-      else { stavColor='#991b1b'; stavBg='#fee2e2'; stavText='▼ '+diff; }
-
-      return `<tr style="background:${rowBg}">
-        <td style="font-family:monospace;font-size:11px;color:#1d4ed8;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.vcm||'–'}</td>
-        <td style="font-size:12px;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:200px">${it.name||'–'}</td>
-        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.rnu||'–'}</td>
-        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.sarza||'–'}</td>
-        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.evCislo||it.cisloMat||'–'}</td>
-        <td style="font-size:11px;text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280">${it.typ||'–'}</td>
-        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.expectedQty} ${it.zmj}</td>
-        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;font-weight:700">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
-        <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">
-          <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${stavColor};background:${stavBg}">${stavText}</span>
-        </td>
-        <td style="font-size:11px;color:#92400e;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:140px">${it.note||''}</td>
-      </tr>`;
-    }).join('');
-
+  // STRANA 2 — kompletný zoznam per sklad
+  const fullSections = invList.map(inv=>{
+    const sorted = [...inv.items].sort((a,b)=>{
+      const r=x=>x.isExtra?1:(!x.scanned&&!x.skipped)?5:x.skipped?4:x.actualQty<x.expectedQty?0:x.actualQty>x.expectedQty?1:3;
+      return r(a)-r(b);
+    });
+    const sc=sorted.filter(x=>x.scanned);
+    const iOk=sc.filter(x=>x.actualQty===x.expectedQty).length;
+    const iOver=sc.filter(x=>x.actualQty>x.expectedQty).length;
+    const iUnder=sc.filter(x=>x.actualQty<x.expectedQty).length;
+    const iSkip=sorted.filter(x=>x.skipped).length;
+    const iExtra=sorted.filter(x=>x.isExtra).length;
+    const iNot=sorted.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
     return `
-    <div style="margin-bottom:32px">
-      <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
-        <tr>
-          <td style="padding:0 0 6px">
-            <span style="font-size:15px;font-weight:700;color:#1e3a5f">${inv.skladName||inv.skladId}</span>
-            <span style="font-family:monospace;font-size:12px;color:#6b7280;margin-left:8px">${inv.skladId}</span>
-          </td>
-          <td style="text-align:right;padding:0 0 6px;white-space:nowrap">
-            <span style="font-size:11px;color:#6b7280">${inv.items.length} pol. · ${sc.length} skenovaných</span>
-          </td>
-        </tr>
-      </table>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#dcfce7;color:#166534">✓ Sedí: ${iOk}</span>
-        ${iOver>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">▲ Prebytok: ${iOver}</span>`:''}
-        ${iUnder>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fee2e2;color:#991b1b">▼ Chýba: ${iUnder}</span>`:''}
-        ${iSkip>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#6b7280">⏭ Preskočené: ${iSkip}</span>`:''}
-        ${iExtra>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">+ Navyše: ${iExtra}</span>`:''}
-        ${iNot>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#6b7280">○ Neskont.: ${iNot}</span>`:''}
+    <div style="margin-bottom:28px">
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="font-size:14px;font-weight:700;color:#1e3a5f">${inv.skladName}</span>
+        <span style="font-family:monospace;font-size:11px;color:#6b7280">${inv.skladId}</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#dbeafe;color:#1d4ed8">Celkom: ${sorted.length}</span>
+        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#dcfce7;color:#166534">✓ ${iOk}</span>
+        ${iOver>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">▲ ${iOver}</span>`:''}
+        ${iUnder>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fee2e2;color:#991b1b">▼ ${iUnder}</span>`:''}
+        ${iSkip>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#6b7280">⏭ ${iSkip}</span>`:''}
+        ${iExtra>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">+ ${iExtra}</span>`:''}
+        ${iNot>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#9ca3af">○ ${iNot}</span>`:''}
       </div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;min-width:700px">
-          <thead>
-            <tr style="background:#1e3a5f">
-              <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">VČM</th>
-              <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">NÁZOV</th>
-              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">RNU / SÉR.Č.</th>
-              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">ŠARŽA</th>
-              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">EV.Č. / DM</th>
-              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">TYP</th>
-              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">EVIDENCIA</th>
-              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">SKUTOČNOSŤ</th>
-              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">VÝSLEDOK</th>
-              <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">POZNÁMKA</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
+          <thead><tr style="background:#1e3a5f">
+            <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">VČM</th>
+            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">RNU</th>
+            <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">NÁZOV</th>
+            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">ŠARŽA</th>
+            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">EV.Č./DM</th>
+            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">TYP</th>
+            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">EVIDENCIA</th>
+            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700;white-space:nowrap">SKUTOČNOSŤ</th>
+            <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;font-weight:700">VÝSLEDOK</th>
+            <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;font-weight:700">POZNÁMKA</th>
+          </tr></thead>
+          <tbody>${_pdfFullRows(sorted)}</tbody>
         </table>
       </div>
     </div>`;
-  }).join('<div style="border-top:2px solid #e5e7eb;margin:28px 0"></div>');
-
-  // Pomocná funkcia pre diff riadky (kratšia tabuľka)
-  function buildRows(items){
-    return items.map((it,idx)=>{
-      const diff = it.scanned ? it.actualQty - it.expectedQty : null;
-      const rowBg = idx%2===0?'#ffffff':'#f8fafc';
-      let stavColor='#6b7280',stavBg='#f3f4f6',stavText='–';
-      if(it.skipped){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='⏭ Preskočené'; }
-      else if(it.isExtra){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='+ Navyše'; }
-      else if(!it.scanned){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='○ Neskont.'; }
-      else if(diff>0){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='▲ +'+diff; }
-      else if(diff<0){ stavColor='#991b1b'; stavBg='#fee2e2'; stavText='▼ '+diff; }
-      return `<tr style="background:${rowBg}">
-        <td style="font-family:monospace;font-size:11px;color:#1d4ed8;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">${it.vcm||'–'}</td>
-        <td style="font-size:12px;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.name||'–'}</td>
-        <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.rnu||'–'}</td>
-        <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.sarza||'–'}</td>
-        <td style="font-family:monospace;font-size:11px;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.expectedQty} ${it.zmj}</td>
-        <td style="font-family:monospace;font-size:11px;font-weight:700;padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center;white-space:nowrap">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
-        <td style="text-align:center;padding:5px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">
-          <span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:700;color:${stavColor};background:${stavBg}">${stavText}</span>
-        </td>
-        <td style="font-size:11px;color:#92400e;padding:5px 8px;border-bottom:1px solid #e5e7eb">${it.note||''}</td>
-      </tr>`;
-    }).join('');
-  }
+  }).join('<div style="border-top:2px solid #e5e7eb;margin:24px 0"></div>');
 
   return `<!DOCTYPE html>
 <html lang="sk">
@@ -2194,20 +2168,18 @@ function buildPDFDocument(invList, title, date){
 <title>${title}</title>
 <style>
   *{box-sizing:border-box}
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:28px 32px;color:#111;background:#fff;font-size:13px}
-  .page-2{margin-top:40px;padding-top:32px;border-top:3px solid #1e3a5f}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px 28px;color:#111;background:#fff;font-size:13px}
+  .page-2{margin-top:40px;padding-top:28px;border-top:3px solid #1e3a5f}
   @media print{
-    body{padding:14px 16px}
+    body{padding:12px 14px}
     .no-print{display:none!important}
-    .page-break{page-break-before:always}
-    .page-2{page-break-before:always;border-top:none;margin-top:0;padding-top:16px}
+    .page-2{page-break-before:always;border-top:none;margin-top:0;padding-top:12px}
     tr{page-break-inside:avoid}
   }
-  @media(max-width:600px){body{padding:14px}}
+  @media(max-width:600px){body{padding:12px}}
 </style>
 </head>
 <body>
-  <!-- HLAVIČKA -->
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px">
     <div>
       <div style="font-size:11px;color:#6b7280;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">NSE Evidencia</div>
@@ -2218,55 +2190,32 @@ function buildPDFDocument(invList, title, date){
         Vygenerované: <strong style="color:#374151">${new Date().toLocaleString('sk-SK')}</strong>
       </div>
     </div>
-    <button class="no-print" onclick="window.print()" style="padding:10px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap">
-      🖨️ Tlačiť / Uložiť PDF
-    </button>
+    <button class="no-print" onclick="window.print()" style="padding:10px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap">🖨️ Tlačiť / Uložiť PDF</button>
   </div>
 
-  <!-- CELKOVÝ SÚHRN -->
-  <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 24px;padding:14px 18px;background:#f0f7ff;border-radius:10px;border-left:4px solid #1d4ed8">
-    <div style="text-align:center;min-width:64px">
-      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#1d4ed8">${totalAll}</div>
-      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Celkom</div>
-    </div>
-    <div style="text-align:center;min-width:64px">
-      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#166534">${okAll}</div>
-      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Sedí</div>
-    </div>
-    <div style="text-align:center;min-width:64px">
-      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#d97706">${overAll}</div>
-      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Prebytok</div>
-    </div>
-    <div style="text-align:center;min-width:64px">
-      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#dc2626">${underAll}</div>
-      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Chýba</div>
-    </div>
-    <div style="text-align:center;min-width:64px">
-      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#6b7280">${skipAll}</div>
-      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Preskočené</div>
-    </div>
-    ${notDone>0?`<div style="text-align:center;min-width:64px">
-      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#9ca3af">${notDone}</div>
-      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Neskont.</div>
-    </div>`:''}
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px;padding:12px 16px;background:#f0f7ff;border-radius:10px;border-left:4px solid #1d4ed8">
+    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#1d4ed8">${totalAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Celkom</div></div>
+    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#166534">${okAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Sedí</div></div>
+    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#d97706">${overAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Prebytok</div></div>
+    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#dc2626">${underAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Chýba</div></div>
+    <div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#6b7280">${skipAll}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Preskočené</div></div>
+    ${notDone>0?`<div style="text-align:center;min-width:60px"><div style="font-size:22px;font-weight:700;font-family:monospace;color:#9ca3af">${notDone}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Neskont.</div></div>`:''}
   </div>
 
-  <!-- STRANA 1: Rozdiely -->
-  <div style="margin:24px 0 8px;display:flex;align-items:center;gap:12px">
-    <h2 style="font-size:16px;font-weight:700;color:#991b1b;margin:0">⚠ STRANA 1 — Rozdiely a nezrovnalosti</h2>
-    <span style="font-size:11px;color:#6b7280">(${diffItems.length} položiek na riešenie)</span>
-  </div>
-  ${diffItems.length===0?'<div style="padding:14px;background:#dcfce7;border-radius:8px;color:#166534;font-weight:600;font-size:14px">✓ Výborné — žiadne rozdiely! Všetky položky sedia.</div>':diffSections}
+  <h2 style="font-size:15px;font-weight:700;color:#991b1b;margin:0 0 12px;display:flex;align-items:center;gap:10px">
+    ⚠ STRANA 1 — Rozdiely a nezrovnalosti
+    <span style="font-size:11px;font-weight:400;color:#6b7280">${diffItems.length} položiek na riešenie</span>
+  </h2>
+  ${diffItems.length===0
+    ? '<div style="padding:14px;background:#dcfce7;border-radius:8px;color:#166534;font-weight:600;font-size:14px;margin-bottom:20px">✓ Výborné — žiadne rozdiely! Všetky položky sedia.</div>'
+    : diffSections}
 
-  <!-- STRANA 2: Kompletný zoznam -->
   <div class="page-2">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <h2 style="font-size:16px;font-weight:700;color:#1e3a5f;margin:0">📋 STRANA 2 — Kompletný zoznam (príloha)</h2>
-    </div>
-    ${sections}
+    <h2 style="font-size:15px;font-weight:700;color:#1e3a5f;margin:0 0 16px">📋 STRANA 2 — Kompletný zoznam (príloha)</h2>
+    ${fullSections}
   </div>
 
-  <div style="margin-top:32px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
+  <div style="margin-top:28px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
     NSE Inventúra &nbsp;·&nbsp; Vygenerované: ${new Date().toLocaleString('sk-SK')}
   </div>
 </body>
