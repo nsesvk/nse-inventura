@@ -189,6 +189,7 @@ canvas#qr-canvas{display:none}
 .ri-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ri-diff{font-family:var(--mono);font-size:13px;font-weight:700;text-align:right;flex-shrink:0}
 .ri-diff.ok{color:var(--green)}.ri-diff.warn{color:var(--amber)}.ri-diff.err{color:var(--red)}.ri-diff.skip{color:var(--text3)}
+
 </style>
 </head>
 <body>
@@ -279,13 +280,20 @@ canvas#qr-canvas{display:none}
         <div style="font-size:11px;color:var(--text3);margin-top:6px">Nastavenia → Chrome → Povolenia → Kamera → Povoliť</div>
       </div>
 
-      <!-- Manuálny vstup VČM -->
+      <!-- Manuálny vstup VČM + spresnenie -->
       <div class="card" style="margin-top:12px">
-        <div class="card-title">Zadaj VČM manuálne</div>
-        <div class="manual-row">
-          <input type="text" id="manual-vcm" placeholder="VCM-001" autocomplete="off">
+        <div class="card-title">Zadaj manuálne</div>
+        <div class="manual-row" style="margin-bottom:8px">
+          <input type="text" id="manual-vcm" placeholder="VČM (napr. VCM-001)" autocomplete="off">
           <button class="btn pr" onclick="onManualVcm()">Hľadať</button>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input type="text" id="manual-rnu" placeholder="RNU (voliteľné)" autocomplete="off"
+            style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 10px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
+          <input type="text" id="manual-sar" placeholder="Šarža (voliteľné)" autocomplete="off"
+            style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:8px 10px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none;-webkit-appearance:none">
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">Vyplň RNU alebo šaržu ak má viacero položiek rovnaké VČM</div>
       </div>
 
       <!-- Stav inventúry -->
@@ -296,7 +304,16 @@ canvas#qr-canvas{display:none}
           <div class="sum-box warn"><div class="sn" id="cnt-over">0</div><div class="sl">Prebytok</div></div>
           <div class="sum-box err"><div class="sn" id="cnt-under">0</div><div class="sl">Chýba</div></div>
         </div>
-        <button class="btn full" onclick="goResults()">📋 Výsledky inventúry</button>
+        <!-- Čakajúce položky -->
+        <div id="pending-list-wrap" style="display:none;margin-bottom:12px">
+          <div style="font-size:10px;color:var(--text3);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px">Ešte neskontrolované</div>
+          <div id="pending-list" style="max-height:160px;overflow-y:auto;border-radius:var(--r);background:var(--bg3);border:1px solid var(--border)"></div>
+          <button class="btn full" style="margin-top:6px;font-size:11px;color:var(--text3)" onclick="togglePendingList()">Skryť zoznam</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="btn full" onclick="togglePendingList()" style="font-size:12px">📋 Čo zostáva</button>
+          <button class="btn pr full" onclick="goResults()">Výsledky</button>
+        </div>
       </div>
     </div>
 
@@ -343,8 +360,26 @@ canvas#qr-canvas{display:none}
         </div>
         <div class="action-row">
           <button class="btn am full" onclick="confirmItem(true)">⏭ Preskočiť</button>
-          <button class="btn ok full" id="btn-confirm" onclick="confirmItem(false)" disabled>✓ Potvrdiť</button>
+          <button class="btn ok full" id="btn-confirm" onclick="confirmItem(false)"
+            onpointerdown="startLongPress()" onpointerup="cancelLongPress()" onpointerleave="cancelLongPress()"
+            disabled>✓ Potvrdiť &nbsp;<span style="font-size:10px;opacity:0.6">(drž = sedí)</span></button>
         </div>
+        <div id="btn-reopen-wrap" style="display:none;margin-top:8px">
+          <button class="btn full" style="font-size:12px;color:var(--amber);border-color:var(--amber)" onclick="reopenItem()">✏️ Opraviť zadaný počet</button>
+        </div>
+      </div>
+
+      <!-- Poznámka k položke -->
+      <div class="card">
+        <div class="card-title">Poznámka (voliteľné)</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="item-note" placeholder="napr. poškodené 2 ks, iná séria..."
+            autocomplete="off"
+            style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;font-size:13px;font-family:var(--font);color:var(--text);outline:none;-webkit-appearance:none"
+            oninput="saveItemNote(this.value)">
+          <button class="btn" onclick="clearItemNote()" style="font-size:12px;color:var(--text3);flex-shrink:0">✕</button>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:5px" id="note-saved-hint"></div>
       </div>
     </div>
 
@@ -410,6 +445,42 @@ canvas#qr-canvas{display:none}
   </div>
 </div>
 
+<!-- MODAL: Položka už skontrolovaná -->
+<div class="mo" id="mo-already">
+  <div class="mo-box">
+    <h2>Položka už skontrolovaná</h2>
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px">
+      <div style="font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:3px" id="mo-already-vcm"></div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px" id="mo-already-name"></div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:2px" id="mo-already-stav"></div>
+      <div style="font-size:12px;color:var(--text3)" id="mo-already-qty"></div>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Chceš opraviť zadaný počet?</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn full" onclick="closeMo('mo-already');resumeScan()">Nie, pokračovať</button>
+      <button class="btn am full" onclick="closeMo('mo-already');reopenItem()">✏️ Opraviť</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Potvrdenie nulového počtu -->
+<div class="mo" id="mo-zero">
+  <div class="mo-box">
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:36px;margin-bottom:8px">⚠️</div>
+      <h2 style="margin:0 0 6px">Zadávate 0 kusov</h2>
+      <div style="font-size:13px;color:var(--text2)" id="mo-zero-name"></div>
+    </div>
+    <div style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:13px;color:var(--red)">
+      Položka <strong>fyzicky chýba</strong> v sklade. Bude vyznačená v reporte ako "Chýba celá".
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn full" onclick="closeMo('mo-zero')">← Opraviť počet</button>
+      <button class="btn dr full" onclick="closeMo('mo-zero');doConfirmItem()">Áno, 0 kusov</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Neznámy VČM -->
 <div class="mo" id="mo-unknown">
   <div class="mo-box">
@@ -447,6 +518,63 @@ canvas#qr-canvas{display:none}
 </div>
 
 <script>
+// ═══════════════════════════════════════════════════════
+// ZVUK — Web Audio API (funguje offline, bez súborov)
+// ═══════════════════════════════════════════════════════
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let _audioCtx = null;
+
+function getAudioCtx(){
+  if(!_audioCtx) try{ _audioCtx = new AudioCtx(); }catch(e){}
+  return _audioCtx;
+}
+
+// Pípnutie: freq=frekvencia Hz, dur=trvanie s, type=tvar vlny
+function beep(freq, dur, type='sine', vol=0.3){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  try{
+    // Obnov ak je suspended (mobilné prehliadače)
+    if(ctx.state === 'suspended') ctx.resume();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type      = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + dur);
+  }catch(e){}
+}
+
+function soundOK(){
+  // Dvojité pípnutie nahor — ✓ Sedí
+  beep(880, 0.08, 'sine', 0.25);
+  setTimeout(()=>beep(1100, 0.12, 'sine', 0.2), 90);
+}
+
+function soundError(){
+  // Hlboké dlhé pípnutie — chýba/rozdiel
+  beep(220, 0.35, 'square', 0.15);
+}
+
+function soundWarning(){
+  // Stredné dvojité — prebytok
+  beep(660, 0.1, 'sine', 0.2);
+  setTimeout(()=>beep(440, 0.15, 'sine', 0.15), 110);
+}
+
+function soundScan(){
+  // Krátke kliknutie — úspešný sken QR
+  beep(1200, 0.05, 'sine', 0.15);
+}
+
+// Inicializuj audio kontext pri prvom dotyku (iOS vyžaduje user gesture)
+document.addEventListener('touchstart', ()=>getAudioCtx(), {once:true});
+document.addEventListener('click', ()=>getAudioCtx(), {once:true});
+
 // ═══════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════
@@ -879,9 +1007,11 @@ function onQR(raw){
   const p=parseQR(raw);
   const st=document.getElementById('cam-status');
   if(p.type==='sklad'){
+    soundScan();
     st.textContent='✓ Sklad: '+p.name; st.className='cam-status active';
     onSkladQR(p.id, p.name);
   } else {
+    soundScan();
     const label = p.vcm || p.id || raw;
     st.textContent='✓ '+label; st.className='cam-status active';
     lookupItem(p);
@@ -926,8 +1056,30 @@ function lookupItem(p){
   // Skórovacie hľadanie — čím viac atribútov sedí, tým lepšia zhoda
   let best = null, bestScore = 0;
 
+  // Najprv skontroluj či položka nebola už skontrolovaná
+  const alreadyDone = INV.items.find(x=>{
+    if(!x.scanned) return false;
+    const s = x.itemId && norm(x.itemId)===id ? true
+      : vcm && norm(x.vcm)===vcm && (!rnu||norm(x.rnu)===rnu) && (!sar||norm(x.sarza)===sar) ? true : false;
+    return s;
+  });
+  if(alreadyDone){
+    // Položka už bola skontrolovaná — ponúkni opravu
+    stopCam();
+    ITEM = alreadyDone;
+    const diff = alreadyDone.actualQty - alreadyDone.expectedQty;
+    const stavTxt = diff===0 ? '✓ Sedí' : diff>0 ? '▲ Prebytok +'+diff : '▼ Chýba '+diff;
+    document.getElementById('mo-already-vcm').textContent = alreadyDone.vcm||alreadyDone.itemId||'–';
+    document.getElementById('mo-already-name').textContent = alreadyDone.name;
+    document.getElementById('mo-already-stav').textContent = stavTxt;
+    document.getElementById('mo-already-stav').style.color = diff===0?'var(--green)':diff>0?'var(--amber)':'var(--red)';
+    document.getElementById('mo-already-qty').textContent = alreadyDone.actualQty+' '+alreadyDone.zmj+' (evidencia: '+alreadyDone.expectedQty+')';
+    openMo('mo-already');
+    return;
+  }
+
   for(const x of INV.items){
-    if(x.scanned && x.actualQty !== null) continue; // už skontrolované, preskoč
+    if(x.scanned && x.actualQty !== null) continue;
 
     let score = 0;
 
@@ -984,10 +1136,15 @@ function addExtra(){
 function resumeScan(){ lastRaw=''; startCam(); }
 
 function onManualVcm(){
-  const v=document.getElementById('manual-vcm').value.trim().toUpperCase();
+  const v   = document.getElementById('manual-vcm').value.trim().toUpperCase();
+  const rnu = document.getElementById('manual-rnu').value.trim();
+  const sar = document.getElementById('manual-sar').value.trim();
   if(!v) return;
-  lookupVcm(v);
+  // Vytvor payload ako keby prišiel z QR kódu
+  lookupItem({ vcm:v, id:'', rnu:rnu, sar:sar, evc:'', dmc:'' });
   document.getElementById('manual-vcm').value='';
+  document.getElementById('manual-rnu').value='';
+  document.getElementById('manual-sar').value='';
 }
 document.getElementById('manual-vcm').addEventListener('keydown',e=>{ if(e.key==='Enter') onManualVcm(); });
 
@@ -1007,9 +1164,14 @@ function renderItem(){
   document.getElementById('np-display').textContent   = '–';
   document.getElementById('btn-confirm').disabled     = true;
   document.getElementById('item-card').className      = 'item-card';
+  document.getElementById('btn-reopen-wrap').style.display = 'none';
   document.getElementById('diff-val').textContent     = '–';
   document.getElementById('diff-val').className       = 'dv';
   document.getElementById('act-box').className        = 'count-box act';
+  const noteEl=document.getElementById('item-note');
+  if(noteEl) noteEl.value=it.note||'';
+  const hintEl=document.getElementById('note-saved-hint');
+  if(hintEl) hintEl.textContent=it.note?'✓ Poznámka uložená':'';
 }
 
 function np(d){
@@ -1042,25 +1204,129 @@ function updateLiveDiff(){
   else{ actBox.className='count-box act under'; card.className='item-card under'; dv.textContent=diff+' (chýba)'; dv.className='dv minus'; }
 }
 
+// Dlhé klepnutie — potvrď s očakávaným počtom (sedí)
+let _longPressTimer = null;
+function startLongPress(){
+  _longPressTimer = setTimeout(()=>{
+    if(!ITEM || ITEM.scanned) return;
+    npVal = String(ITEM.expectedQty);
+    document.getElementById('np-display').textContent = npVal;
+    document.getElementById('btn-confirm').disabled = false;
+    updateLiveDiff();
+    // Krátka vibrácia ak je dostupná
+    if(navigator.vibrate) navigator.vibrate(60);
+    toast('Počet nastavený na '+npVal+' (evidencia)','info');
+  }, 600);
+}
+function cancelLongPress(){ if(_longPressTimer){ clearTimeout(_longPressTimer); _longPressTimer=null; } }
+
 function confirmItem(skip){
   if(skip){
     ITEM.skipped=true; ITEM.scanned=false; ITEM.actualQty=null;
     toast('Preskočené','warn');
-  } else {
-    if(!npVal) return;
-    ITEM.actualQty=parseInt(npVal); ITEM.scanned=true; ITEM.skipped=false;
-    const diff=ITEM.actualQty-ITEM.expectedQty;
-    if(diff===0) toast('✓ Sedí!','ok');
-    else if(diff>0) toast('⚠ Prebytok: +'+diff,'warn');
-    else toast('✗ Chýba: '+diff,'err');
+    soundWarning();
+    saveDB(); updateProg(); updateCounts();
+    document.getElementById('btn-reopen-wrap').style.display='block';
+    document.getElementById('btn-confirm').disabled=true;
+    setTimeout(()=>{
+      document.getElementById('btn-reopen-wrap').style.display='none';
+      const next=INV.items.find(x=>!x.scanned&&!x.skipped&&!x.isExtra);
+      if(next) goScan(); else{ toast('🏁 Všetky položky skontrolované!','ok'); goResults(); }
+    }, 400);
+    return;
   }
-  saveDB(); updateProg(); updateCounts();
+  if(!npVal) return;
+  // Varovanie pri 0 kusoch
+  const qty = parseInt(npVal);
+  if(qty === 0 && ITEM.expectedQty > 0){
+    document.getElementById('mo-zero-name').textContent = ITEM.name;
+    openMo('mo-zero');
+    return;
+  }
+  doConfirmItem();
+}
 
+function doConfirmItem(){
+  if(!npVal) return;
+  ITEM.actualQty=parseInt(npVal); ITEM.scanned=true; ITEM.skipped=false;
+  const diff=ITEM.actualQty-ITEM.expectedQty;
+  if(diff===0){ toast('✓ Sedí!','ok'); soundOK(); }
+  else if(diff>0){ toast('⚠ Prebytok: +'+diff,'warn'); soundWarning(); }
+  else{ toast('✗ Chýba: '+diff,'err'); soundError(); }
+  saveDB(); updateProg(); updateCounts();
+  document.getElementById('btn-reopen-wrap').style.display='block';
+  document.getElementById('btn-confirm').disabled=true;
   setTimeout(()=>{
+    document.getElementById('btn-reopen-wrap').style.display='none';
     const next=INV.items.find(x=>!x.scanned&&!x.skipped&&!x.isExtra);
-    if(next) goScan();
-    else{ toast('🏁 Všetky položky skontrolované!','ok'); goResults(); }
-  }, 500);
+    if(next) goScan(); else{ toast('🏁 Všetky položky skontrolované!','ok'); goResults(); }
+  }, 1500);
+}
+
+// Uloží poznámku k položke
+function saveItemNote(val){
+  if(!ITEM) return;
+  ITEM.note = val.trim();
+  saveDB();
+  const hintEl = document.getElementById('note-saved-hint');
+  if(hintEl) hintEl.textContent = val.trim() ? '✓ Uložené' : '';
+}
+
+function clearItemNote(){
+  if(!ITEM) return;
+  ITEM.note = '';
+  saveDB();
+  const noteEl = document.getElementById('item-note');
+  if(noteEl) noteEl.value = '';
+  const hintEl = document.getElementById('note-saved-hint');
+  if(hintEl) hintEl.textContent = '';
+}
+
+// Zoznam čakajúcich položiek na scan screene
+function togglePendingList(){
+  if(!INV) return;
+  const wrap = document.getElementById('pending-list-wrap');
+  const list = document.getElementById('pending-list');
+  if(wrap.style.display==='block'){ wrap.style.display='none'; return; }
+
+  // Zozbieraj neskontrolované, zoraď podľa pozície
+  const pending = INV.items
+    .filter(x=>!x.scanned&&!x.skipped&&!x.isExtra)
+    .sort((a,b)=>(a.pos||'').localeCompare(b.pos||''));
+
+  if(!pending.length){
+    list.innerHTML='<div style="padding:12px;text-align:center;font-size:12px;color:var(--green)">✓ Všetky položky skontrolované!</div>';
+  } else {
+    list.innerHTML = pending.map(it=>`
+      <div onclick="goItem(INV.items.find(x=>x.vcm===\'${it.vcm.replace(/'/g,"\\'")}\' && !x.scanned))"
+        style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--accent)">${it.vcm||'–'}</div>
+          <div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name}</div>
+          ${it.pos?`<div style="font-size:10px;color:var(--text3)">Pozícia: ${it.pos}</div>`:''}
+        </div>
+        <div style="font-size:11px;color:var(--text3);flex-shrink:0">${it.expectedQty} ${it.zmj}</div>
+      </div>`).join('');
+  }
+  wrap.style.display='block';
+}
+
+// Oprav zadaný počet — vynuluj potvrdenie a nechaj znova zadať
+function reopenItem(){
+  ITEM.actualQty = null;
+  ITEM.scanned   = false;
+  ITEM.skipped   = false;
+  npVal = '';
+  saveDB();
+  document.getElementById('btn-reopen-wrap').style.display = 'none';
+  document.getElementById('np-display').textContent = '–';
+  document.getElementById('btn-confirm').disabled = true;
+  document.getElementById('act-qty').textContent = '–';
+  document.getElementById('act-box').className = 'count-box act';
+  document.getElementById('item-card').className = 'item-card';
+  document.getElementById('diff-val').textContent = '–';
+  document.getElementById('diff-val').className = 'dv';
+  toast('Zadaj nový počet','info');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1107,8 +1373,9 @@ function renderResults(){
     return `<div class="ri" onclick="goItem(INV.items[${origIdx}])">
       <div class="ri-icon ${cls}">${icon}</div>
       <div class="ri-body">
-        <div class="ri-vcm">${it.vcm}</div>
+        <div class="ri-vcm">${it.vcm}${it.rnu?' · '+it.rnu:''}${it.sarza?' · '+it.sarza:''}</div>
         <div class="ri-name">${it.name}</div>
+        ${it.note?`<div style="font-size:10px;color:var(--amber);margin-top:1px">📝 ${it.note}</div>`:''}
       </div>
       <div>
         <div class="ri-diff ${cls}">${diff}</div>
@@ -1228,90 +1495,184 @@ function buildSkladSection(inv){
   </div>`;
 }
 
-// Exportuje PDF pre jeden sklad
+// Exportuje report pre jeden sklad
 function exportPDF(inv){
   if(!inv) return;
   const html = buildPDFDocument([inv], 'Inventúrny report – '+inv.skladName, inv.date);
-  const w = window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>{ w.print(); }, 600);
+  dlFile('report_'+inv.skladId+'_'+isoDate()+'.html', html, 'text/html');
+  toast('Report stiahnutý — otvor súbor a vytlač ako PDF','ok');
 }
 
-// Exportuje PDF pre všetky sklady naraz
+// Exportuje jeden PDF pre všetky sklady
 function exportAllPDF(inventories){
-  const title = 'Inventúrny report – Všetky sklady';
-  const date  = new Date().toLocaleDateString('sk-SK');
-  const html  = buildPDFDocument(inventories, title, date);
-  const w = window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>{ w.print(); }, 600);
+  const date = new Date().toLocaleDateString('sk-SK');
+  const html = buildPDFDocument(inventories, 'Inventúrny report – Všetky sklady', date);
+  dlFile('inventura_report_vsetky_sklady_'+isoDate()+'.html', html, 'text/html');
+  toast('Report stiahnutý — otvor súbor a vytlač ako PDF','ok');
 }
 
+// Vygeneruje kompletný HTML report (stiahne sa ako súbor, otvorí v prehliadači, tlačí ako PDF)
 function buildPDFDocument(invList, title, date){
-  // Celkový súhrn naprieč všetkými skladmi
-  const allItems  = invList.flatMap(i=>i.items);
-  const totalAll  = allItems.length;
-  const okAll     = allItems.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
-  const overAll   = allItems.filter(x=>x.scanned&&x.actualQty>x.expectedQty).length;
-  const underAll  = allItems.filter(x=>x.scanned&&x.actualQty<x.expectedQty).length;
-  const skipAll   = allItems.filter(x=>x.skipped).length;
+  const allItems = invList.flatMap(i=>i.items);
+  const totalAll = allItems.length;
+  const okAll    = allItems.filter(x=>x.scanned&&x.actualQty===x.expectedQty).length;
+  const overAll  = allItems.filter(x=>x.scanned&&x.actualQty>x.expectedQty).length;
+  const underAll = allItems.filter(x=>x.scanned&&x.actualQty<x.expectedQty).length;
+  const skipAll  = allItems.filter(x=>x.skipped).length;
+  const notDone  = allItems.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
 
-  const sections = invList.map(buildSkladSection).join('<hr style="border:none;border-top:2px solid #e5e7eb;margin:24px 0">');
+  const sections = invList.map(inv => {
+    const sc    = inv.items.filter(x=>x.scanned);
+    const iOk   = sc.filter(x=>x.actualQty===x.expectedQty).length;
+    const iOver = sc.filter(x=>x.actualQty>x.expectedQty).length;
+    const iUnder= sc.filter(x=>x.actualQty<x.expectedQty).length;
+    const iSkip = inv.items.filter(x=>x.skipped).length;
+    const iExtra= inv.items.filter(x=>x.isExtra).length;
+    const iNot  = inv.items.filter(x=>!x.scanned&&!x.skipped&&!x.isExtra).length;
+
+    const rows = inv.items.map((it,idx) => {
+      const diff  = it.scanned ? it.actualQty - it.expectedQty : null;
+      const stav  = getStav(it);
+      const isOdd = idx % 2 === 0;
+      const rowBg = isOdd ? '#ffffff' : '#f8fafc';
+
+      let stavColor='#374151', stavBg='#f3f4f6', stavText=stav;
+      if(it.skipped){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='⏭ Preskočené'; }
+      else if(it.isExtra){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='+ Navyše'; }
+      else if(!it.scanned){ stavColor='#6b7280'; stavBg='#f3f4f6'; stavText='○ Neskontrolované'; }
+      else if(diff===0){ stavColor='#166534'; stavBg='#dcfce7'; stavText='✓ Sedí'; }
+      else if(diff>0){ stavColor='#92400e'; stavBg='#fef3c7'; stavText='▲ +'+diff; }
+      else { stavColor='#991b1b'; stavBg='#fee2e2'; stavText='▼ '+diff; }
+
+      return `<tr style="background:${rowBg}">
+        <td style="font-family:monospace;font-size:11px;color:#1d4ed8;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.vcm||'–'}</td>
+        <td style="font-size:12px;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:200px">${it.name||'–'}</td>
+        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.rnu||'–'}</td>
+        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.sarza||'–'}</td>
+        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151">${it.evCislo||it.cisloMat||'–'}</td>
+        <td style="font-size:11px;text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#6b7280">${it.typ||'–'}</td>
+        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb">${it.expectedQty} ${it.zmj}</td>
+        <td style="font-family:monospace;font-size:11px;text-align:center;white-space:nowrap;padding:6px 8px;border-bottom:1px solid #e5e7eb;font-weight:700">${it.actualQty!==null?it.actualQty+' '+it.zmj:'–'}</td>
+        <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap">
+          <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${stavColor};background:${stavBg}">${stavText}</span>
+        </td>
+        <td style="font-size:11px;color:#92400e;padding:6px 8px;border-bottom:1px solid #e5e7eb;max-width:140px">${it.note||''}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+    <div style="margin-bottom:32px">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+        <tr>
+          <td style="padding:0 0 6px">
+            <span style="font-size:15px;font-weight:700;color:#1e3a5f">${inv.skladName||inv.skladId}</span>
+            <span style="font-family:monospace;font-size:12px;color:#6b7280;margin-left:8px">${inv.skladId}</span>
+          </td>
+          <td style="text-align:right;padding:0 0 6px;white-space:nowrap">
+            <span style="font-size:11px;color:#6b7280">${inv.items.length} pol. · ${sc.length} skenovaných</span>
+          </td>
+        </tr>
+      </table>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#dcfce7;color:#166534">✓ Sedí: ${iOk}</span>
+        ${iOver>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">▲ Prebytok: ${iOver}</span>`:''}
+        ${iUnder>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fee2e2;color:#991b1b">▼ Chýba: ${iUnder}</span>`:''}
+        ${iSkip>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#6b7280">⏭ Preskočené: ${iSkip}</span>`:''}
+        ${iExtra>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fef3c7;color:#92400e">+ Navyše: ${iExtra}</span>`:''}
+        ${iNot>0?`<span style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#f3f4f6;color:#6b7280">○ Neskont.: ${iNot}</span>`:''}
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:700px">
+          <thead>
+            <tr style="background:#1e3a5f">
+              <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">VČM</th>
+              <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">NÁZOV</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">RNU / SÉR.Č.</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">ŠARŽA</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">EV.Č. / DM</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">TYP</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">EVIDENCIA</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700;white-space:nowrap">SKUTOČNOSŤ</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">VÝSLEDOK</th>
+              <th style="padding:7px 8px;text-align:left;font-size:10px;color:#fff;letter-spacing:0.5px;font-weight:700">POZNÁMKA</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('<div style="border-top:2px solid #e5e7eb;margin:28px 0"></div>');
 
   return `<!DOCTYPE html>
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
 <style>
   *{box-sizing:border-box}
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px 28px;color:#111;background:#fff;font-size:13px}
-  h1{font-size:20px;font-weight:700;color:#1e3a5f;margin:0 0 4px}
-  .meta{font-size:12px;color:#6b7280;margin-bottom:20px}
-  .total-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;padding:14px;background:#f0f7ff;border-radius:8px;border-left:4px solid #1d4ed8}
-  .ts-item{text-align:center;min-width:80px}
-  .ts-n{font-size:22px;font-weight:700;font-family:monospace}
-  .ts-l{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px}
-  .ts-ok .ts-n{color:#16a34a}.ts-over .ts-n{color:#d97706}.ts-under .ts-n{color:#dc2626}.ts-tot .ts-n{color:#1d4ed8}
-  tr:nth-child(even) td{background:#f9fafb}
-  td{padding:6px 8px;border-bottom:1px solid #e5e7eb;vertical-align:middle}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:28px 32px;color:#111;background:#fff;font-size:13px}
   @media print{
-    body{padding:12px 16px;font-size:11px}
-    h1{font-size:16px}
-    .no-print{display:none}
+    body{padding:16px 18px}
+    .no-print{display:none!important}
+    .page-break{page-break-before:always}
     tr{page-break-inside:avoid}
-    h2{page-break-before:auto}
+    h2{page-break-after:avoid}
   }
+  @media(max-width:600px){body{padding:16px}}
 </style>
 </head>
 <body>
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px">
     <div>
-      <h1>📦 ${title}</h1>
-      <div class="meta">
-        Dátum: <strong>${date}</strong> &nbsp;·&nbsp;
-        Počet skladov: <strong>${invList.length}</strong> &nbsp;·&nbsp;
-        Vygenerované: ${new Date().toLocaleString('sk-SK')}
+      <div style="font-size:11px;color:#6b7280;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">NSE Evidencia</div>
+      <h1 style="font-size:20px;font-weight:700;color:#1e3a5f;margin:0 0 4px">📦 INVENTÚRNY REPORT</h1>
+      <div style="font-size:12px;color:#6b7280">
+        Dátum: <strong style="color:#374151">${date}</strong> &nbsp;·&nbsp;
+        Sklady: <strong style="color:#374151">${invList.length}</strong> &nbsp;·&nbsp;
+        Vygenerované: <strong style="color:#374151">${new Date().toLocaleString('sk-SK')}</strong>
       </div>
     </div>
-    <button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Tlačiť / Uložiť PDF</button>
+    <button class="no-print" onclick="window.print()" style="padding:10px 20px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;white-space:nowrap">
+      🖨️ Tlačiť / Uložiť PDF
+    </button>
   </div>
 
-  <div class="total-summary">
-    <div class="ts-item ts-tot"><div class="ts-n">${totalAll}</div><div class="ts-l">Celkom</div></div>
-    <div class="ts-item ts-ok"><div class="ts-n">${okAll}</div><div class="ts-l">Sedí</div></div>
-    <div class="ts-item ts-over"><div class="ts-n">${overAll}</div><div class="ts-l">Prebytok</div></div>
-    <div class="ts-item ts-under"><div class="ts-n">${underAll}</div><div class="ts-l">Chýba</div></div>
-    <div class="ts-item"><div class="ts-n" style="color:#6b7280">${skipAll}</div><div class="ts-l">Preskočené</div></div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 24px;padding:14px 18px;background:#f0f7ff;border-radius:10px;border-left:4px solid #1d4ed8">
+    <div style="text-align:center;min-width:64px">
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#1d4ed8">${totalAll}</div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Celkom</div>
+    </div>
+    <div style="text-align:center;min-width:64px">
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#166534">${okAll}</div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Sedí</div>
+    </div>
+    <div style="text-align:center;min-width:64px">
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#d97706">${overAll}</div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Prebytok</div>
+    </div>
+    <div style="text-align:center;min-width:64px">
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#dc2626">${underAll}</div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Chýba</div>
+    </div>
+    <div style="text-align:center;min-width:64px">
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#6b7280">${skipAll}</div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Preskočené</div>
+    </div>
+    ${notDone>0?`<div style="text-align:center;min-width:64px">
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#9ca3af">${notDone}</div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px">Neskont.</div>
+    </div>`:''}
   </div>
 
   ${sections}
+
+  <div style="margin-top:32px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
+    NSE Inventúra &nbsp;·&nbsp; Vygenerované: ${new Date().toLocaleString('sk-SK')}
+  </div>
 </body>
 </html>`;
 }
-
 function dlFile(name, cnt, mime){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([cnt],{type:mime}));
