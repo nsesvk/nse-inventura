@@ -811,6 +811,7 @@ function parseQR(raw){
     if(o.type==='NSE_SKLAD') return {type:'sklad',id:o.id,name:o.name};
     if(o.t==='NSE_SYNC') return {type:'sync',raw};
     if(o.t==='NSE_ITEM') return {type:'item',id:o.id||'',vcm:o.vcm||'',rnu:o.rnu||'',sar:o.sar||'',evc:o.evc||'',dmc:o.dmc||''};
+    if(o.t==='NSE_AGG') return {type:'item',id:'',vcm:o.v||'',rnu:'',sar:'',evc:'',dmc:'',qty:o.q,zmj:o.u}; // Agregovaný QR kód
     return {type:'item',id:o.id||'',vcm:(o.vcm||o.VCM||''),rnu:'',sar:'',evc:'',dmc:''};
   }catch{return {type:'item',id:'',vcm:raw,rnu:'',sar:'',evc:'',dmc:''};}
 }
@@ -844,16 +845,6 @@ function startEmptyInv(){
 
 function lookupItem(p){
   if(!INV){toast('Najprv naskenuj QR kód skladu','warn');return;}
-  
-  // Rozpoznanie agregovaného QR kódu (NSE_AGG)
-  if(p.t === 'NSE_AGG'){
-    p = {
-      vcm: p.v,
-      qty: p.q,
-      zmj: p.u
-    };
-  }
-  
   const norm=s=>(s||'').trim().toLowerCase();
   const vcm=norm(p.vcm),rnu=norm(p.rnu),sar=norm(p.sar),evc=norm(p.evc),id=norm(p.id);
 
