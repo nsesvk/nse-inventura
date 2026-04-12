@@ -844,6 +844,16 @@ function startEmptyInv(){
 
 function lookupItem(p){
   if(!INV){toast('Najprv naskenuj QR kód skladu','warn');return;}
+  
+  // Rozpoznanie agregovaného QR kódu (NSE_AGG)
+  if(p.t === 'NSE_AGG'){
+    p = {
+      vcm: p.v,
+      qty: p.q,
+      zmj: p.u
+    };
+  }
+  
   const norm=s=>(s||'').trim().toLowerCase();
   const vcm=norm(p.vcm),rnu=norm(p.rnu),sar=norm(p.sar),evc=norm(p.evc),id=norm(p.id);
 
