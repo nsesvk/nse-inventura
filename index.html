@@ -287,7 +287,7 @@ html,body{height:100%;background:#0f1117;color:#e8eaf0;font-family:-apple-system
         <!-- Akčné tlačidlá - zobrazujú sa po zadaní čísla -->
         <div id="result-actions" style="display:none;margin-top:14px">
           <button class="btn ok full xl" id="btn-confirm-main" onclick="confirmCount()" style="font-size:16px;padding:16px;font-weight:700">✓ Potvrdiť a ďalej</button>
-          <button class="btn full" onclick="openNumpad()" style="margin-top:8px;font-size:14px;color:var(--accent);border-color:var(--accent)">✏️ Opraviť</button>
+          <button class="btn full" onclick="reopenForEdit()" style="margin-top:8px;font-size:14px;color:var(--accent);border-color:var(--accent)">✏️ Opraviť</button>
           <button class="btn am full" onclick="skipItem()" style="margin-top:8px;font-size:13px">⏭ Preskočiť položku</button>
         </div>
       </div>
@@ -1034,6 +1034,20 @@ function reopenItem(){
   ITEM.actualQty=null;ITEM.scanned=false;ITEM.skipped=false;npVal='';saveDB();
   document.getElementById('reopen-wrap').style.display='none';
   renderItem();openNumpad();toast('Zadaj nový počet','info');
+}
+
+function reopenForEdit(){
+  if(!ITEM)return;
+  // Resetuj len npVal a zobraz numpad
+  npVal='';
+  document.getElementById('np-display').textContent='–';
+  document.getElementById('btn-confirm').disabled=true;
+  document.getElementById('result-actions').style.display='none';
+  document.getElementById('diff-row').style.display='none';
+  document.getElementById('act-qty').textContent='–';
+  document.getElementById('item-card').className='item-card';
+  openNumpad();
+  toast('Zadaj nový počet','info');
 }
 
 function saveNote(v){if(!ITEM)return;ITEM.note=v.trim();saveDB();document.getElementById('note-hint').textContent=v.trim()?'✓ Uložená':'';}
