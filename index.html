@@ -270,25 +270,23 @@ html,body{height:100%;background:#0f1117;color:#e8eaf0;font-family:-apple-system
           <span class="tag" id="item-sklad" style="background:var(--bg3);color:var(--text3)"></span>
         </div>
         <div id="item-det" style="font-size:11px;color:var(--text3);margin-bottom:10px;display:none"></div>
-        <div class="counts-grid">
-          <div class="count-box exp"><div class="cn" id="exp-qty">0</div><div class="cl">Evidencia</div></div>
-          <div class="count-box act" id="act-box"><div class="cn" id="act-qty">–</div><div class="cl">Skutočnosť</div></div>
+        
+        <!-- SKRYTÉ očakávané množstvo - zobrazí sa až po zadaní -->
+        <div id="exp-qty-hidden" style="display:none" data-expected="0"></div>
+        
+        <div class="counts-grid" style="grid-template-columns:1fr">
+          <div class="count-box act" id="act-box">
+            <div class="cn" id="act-qty">–</div>
+            <div class="cl">Zadaj počet kusov</div>
+          </div>
         </div>
         <div class="diff-row" id="diff-row" style="display:none">
-          <span style="font-size:12px;color:var(--text3)">Rozdiel</span>
+          <span style="font-size:12px;color:var(--text3)">Výsledok</span>
           <span class="dv" id="diff-val">–</span>
         </div>
       </div>
-      <!-- Rýchly mód -->
-      <div id="quick-mode">
-        <button class="quick-sedi" id="btn-sedi" onclick="quickSedi()">
-          <span style="font-size:28px">✓</span>
-          <div><div>SEDÍ</div><div style="font-size:13px;font-weight:400;opacity:0.8" id="sedi-label"></div></div>
-        </button>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button class="quick-iny" onclick="openNumpad()">✏️ Iný počet</button>
-          <button class="quick-iny" style="color:var(--amber);border-color:var(--amber)" onclick="skipItem()">⏭ Preskočiť</button>
-        </div>
+      <!-- Rýchly mód - ODSTRÁNENÝ, vždy sa musí zadať číslo -->
+      <div id="quick-mode" style="display:none">
       </div>
       <!-- Numpad -->
       <div class="numpad-wrap" id="numpad-wrap">
@@ -907,7 +905,10 @@ function renderItem(){
   document.getElementById('item-sklad').textContent=INV.skladId;
   const det=[it.rnu?'RNU: '+it.rnu:'',it.sarza?'Šarža: '+it.sarza:'',it.evCislo?'Ev.č.: '+it.evCislo:''].filter(Boolean).join('  ·  ');
   const detEl=document.getElementById('item-det'); detEl.textContent=det; detEl.style.display=det?'block':'none';
-  document.getElementById('exp-qty').textContent=it.expectedQty;
+  
+  // SKRYTÉ očakávané množstvo - uložené v data atribúte
+  document.getElementById('exp-qty-hidden').setAttribute('data-expected', it.expectedQty);
+  
   document.getElementById('act-qty').textContent=it.actualQty!==null?it.actualQty:'–';
   document.getElementById('item-card').className='item-card';
   document.getElementById('diff-row').style.display='none';
@@ -915,34 +916,64 @@ function renderItem(){
   document.getElementById('act-box').className='count-box act';
   document.getElementById('reopen-wrap').style.display='none';
   npVal=''; document.getElementById('np-display').textContent='–'; document.getElementById('btn-confirm').disabled=true;
-  document.getElementById('sedi-label').textContent=it.expectedQty+' '+it.zmj+' podľa evidencie';
+  
   // Progres
   if(INV){const done=INV.items.filter(x=>x.scanned||x.skipped).length;document.getElementById('item-prog').textContent=done+'/'+INV.items.length+' skontrolovaných';}
   // Poznámka
   document.getElementById('item-note').value=it.note||'';
   document.getElementById('note-hint').textContent=it.note?'✓ Poznámka uložená':'';
-  // Ak opravujem
-  if(it.scanned&&it.actualQty!==null){npVal=String(it.actualQty);document.getElementById('np-display').textContent=npVal;document.getElementById('btn-confirm').disabled=false;openNumpad();updateDiff();}
-  else closeNumpad();
+  
+  // VŽDY otvoriť numpad (nie quick mode)
+  if(it.scanned&&it.actualQty!==null){
+    npVal=String(it.actualQty);
+    document.getElementById('np-display').textContent=npVal;
+    document.getElementById('btn-confirm').disabled=false;
+    openNumpad();
+    updateDiff();
+  } else {
+    openNumpad(); // Vždy otvoriť numpad
+  }
 }
 
-function openNumpad(){document.getElementById('quick-mode').style.display='none';document.getElementById('numpad-wrap').classList.add('open');}
-function closeNumpad(){document.getElementById('quick-mode').style.display='block';document.getElementById('numpad-wrap').classList.remove('open');npVal='';document.getElementById('np-display').textContent='–';document.getElementById('btn-confirm').disabled=true;document.getElementById('act-qty').textContent=ITEM&&ITEM.actualQty!==null?ITEM.actualQty:'–';document.getElementById('act-box').className='count-box act';document.getElementById('diff-row').style.display='none';document.getElementById('item-card').className='item-card';}
+function openNumpad(){
+  document.getElementById('quick-mode').style.display='none';
+  document.getElementById('numpad-wrap').classList.add('open');
+}
+function closeNumpad(){document.getElementById('quick-mode').style.display='none';document.getElementById('numpad-wrap').classList.remove('open');npVal='';document.getElementById('np-display').textContent='–';document.getElementById('btn-confirm').disabled=true;document.getElementById('act-qty').textContent=ITEM&&ITEM.actualQty!==null?ITEM.actualQty:'–';document.getElementById('act-box').className='count-box act';document.getElementById('diff-row').style.display='none';document.getElementById('item-card').className='item-card';}
 
-function quickSedi(){if(!ITEM)return;npVal=String(ITEM.expectedQty);doConfirm();}
 function skipItem(){if(!ITEM)return;ITEM.skipped=true;ITEM.scanned=false;ITEM.actualQty=null;sndWarn();saveDB();updateProg();updateCounts();document.getElementById('reopen-wrap').style.display='block';toast('Preskočené','warn');setTimeout(()=>{document.getElementById('reopen-wrap').style.display='none';nextItem();},400);}
 
 function np(d){if(npVal.length>=6)return;npVal+=d;document.getElementById('np-display').textContent=npVal;document.getElementById('btn-confirm').disabled=false;updateDiff();}
 function npDel(){if(!npVal)return;npVal=npVal.slice(0,-1);document.getElementById('np-display').textContent=npVal||'–';document.getElementById('btn-confirm').disabled=!npVal;if(!npVal){document.getElementById('act-qty').textContent=ITEM.actualQty!==null?ITEM.actualQty:'–';document.getElementById('act-box').className='count-box act';document.getElementById('diff-row').style.display='none';document.getElementById('item-card').className='item-card';}else updateDiff();}
 
 function updateDiff(){
-  const actual=parseInt(npVal),exp=ITEM.expectedQty,diff=actual-exp;
+  const actual=parseInt(npVal);
+  const exp=parseInt(document.getElementById('exp-qty-hidden').getAttribute('data-expected'));
+  const diff=actual-exp;
+  
   document.getElementById('act-qty').textContent=actual;
   document.getElementById('diff-row').style.display='flex';
+  
   const ab=document.getElementById('act-box'),card=document.getElementById('item-card'),dv=document.getElementById('diff-val');
-  if(diff===0){ab.className='count-box act match';card.className='item-card match';dv.textContent='✓ Sedí';dv.className='dv ok';}
-  else if(diff>0){ab.className='count-box act over';card.className='item-card over';dv.textContent='+'+diff+' (prebytok)';dv.className='dv plus';}
-  else{ab.className='count-box act under';card.className='item-card under';dv.textContent=diff+' (chýba)';dv.className='dv minus';}
+  
+  if(diff===0){
+    ab.className='count-box act match';
+    card.className='item-card match';
+    dv.textContent='✓ SÚHLASÍ S INVENTÁRNYM ZOZNAMOM';
+    dv.className='dv ok';
+  }
+  else if(diff>0){
+    ab.className='count-box act over';
+    card.className='item-card over';
+    dv.textContent='✗ NESÚHLASÍ (+'+diff+' prebytok)';
+    dv.className='dv plus';
+  }
+  else{
+    ab.className='count-box act under';
+    card.className='item-card under';
+    dv.textContent='✗ NESÚHLASÍ ('+diff+' chýba)';
+    dv.className='dv minus';
+  }
 }
 
 function confirmCount(){
