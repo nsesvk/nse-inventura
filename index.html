@@ -985,7 +985,7 @@ function updateDiff(){
     card.className='item-card match';
     diffRow.style.borderColor='var(--green)';
     diffRow.style.background='var(--green-bg)';
-    dv.innerHTML='<div style="font-size:36px;margin-bottom:4px">✓</div><div>SÚHLASÍ S INVENTÁRNYM ZOZNAMOM</div>';
+    dv.innerHTML='<div style="font-size:36px;margin-bottom:4px">✓</div><div>SÚHLASÍ</div>';
     dv.className='dv ok';
   }
   else if(diff>0){
@@ -993,7 +993,7 @@ function updateDiff(){
     card.className='item-card over';
     diffRow.style.borderColor='var(--amber)';
     diffRow.style.background='var(--amber-bg)';
-    dv.innerHTML='<div style="font-size:36px;margin-bottom:4px">⚠</div><div>NESÚHLASÍ S INVENTÁRNYM ZOZNAMOM</div><div style="font-size:14px;margin-top:4px;opacity:0.8">Prebytok: +'+diff+' ks</div>';
+    dv.innerHTML='<div style="font-size:36px;margin-bottom:4px">⚠</div><div>NESÚHLASÍ</div><div style="font-size:14px;margin-top:4px;opacity:0.8">Prebytok: +'+diff+' ks</div>';
     dv.className='dv plus';
   }
   else{
@@ -1001,7 +1001,7 @@ function updateDiff(){
     card.className='item-card under';
     diffRow.style.borderColor='var(--red)';
     diffRow.style.background='var(--red-bg)';
-    dv.innerHTML='<div style="font-size:36px;margin-bottom:4px">✗</div><div>NESÚHLASÍ S INVENTÁRNYM ZOZNAMOM</div><div style="font-size:14px;margin-top:4px;opacity:0.8">Chýba: '+diff+' ks</div>';
+    dv.innerHTML='<div style="font-size:36px;margin-bottom:4px">✗</div><div>NESÚHLASÍ</div><div style="font-size:14px;margin-top:4px;opacity:0.8">Chýba: '+diff+' ks</div>';
     dv.className='dv minus';
   }
 }
