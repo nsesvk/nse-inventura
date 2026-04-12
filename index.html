@@ -286,10 +286,8 @@ html,body{height:100%;background:#0f1117;color:#e8eaf0;font-family:-apple-system
         
         <!-- Akčné tlačidlá - zobrazujú sa po zadaní čísla -->
         <div id="result-actions" style="display:none;margin-top:14px">
-          <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px">
-            <button class="btn" onclick="openNumpad()" style="font-size:13px">✏️ Opraviť</button>
-            <button class="btn ok" id="btn-confirm-main" onclick="confirmCount()">✓ Potvrdiť a ďalej</button>
-          </div>
+          <button class="btn ok full xl" id="btn-confirm-main" onclick="confirmCount()" style="font-size:16px;padding:16px;font-weight:700">✓ Potvrdiť a ďalej</button>
+          <button class="btn full" onclick="openNumpad()" style="margin-top:8px;font-size:14px;color:var(--accent);border-color:var(--accent)">✏️ Opraviť</button>
           <button class="btn am full" onclick="skipItem()" style="margin-top:8px;font-size:13px">⏭ Preskočiť položku</button>
         </div>
       </div>
